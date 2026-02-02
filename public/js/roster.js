@@ -3,12 +3,14 @@
   endDate: null,
   days: [],
   rows: [],
-  guards: []
+  guards: [],
+  clients: []
 };
 
 let currentModalContext = null;
 let rosterMode = 'day';
 let currentEntryStatus = 'unconfirmed';
+let currentRowEditId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeRoster();
@@ -21,6 +23,16 @@ function initializeRoster() {
   document.getElementById('dayModeBtn').addEventListener('click', () => setRosterMode('day'));
   document.getElementById('monthModeBtn').addEventListener('click', () => setRosterMode('monthly'));
   document.getElementById('reportBtn').addEventListener('click', openMonthlyReport);
+  const addRowBtn = document.getElementById('addRowBtn');
+  if (addRowBtn) addRowBtn.addEventListener('click', openRowModal);
+  const monthPicker = document.getElementById('rosterMonthPicker');
+  if (monthPicker) monthPicker.addEventListener('change', handleMonthChange);
+  const rowModalClose = document.getElementById('closeRowModal');
+  if (rowModalClose) rowModalClose.addEventListener('click', closeRowModal);
+  const rowModalCancel = document.getElementById('cancelRowBtn');
+  if (rowModalCancel) rowModalCancel.addEventListener('click', closeRowModal);
+  const saveRowBtn = document.getElementById('saveRowBtn');
+  if (saveRowBtn) saveRowBtn.addEventListener('click', saveRosterRow);
   document.getElementById('closeRosterModal').addEventListener('click', closeRosterModal);
   document.getElementById('cancelRosterBtn').addEventListener('click', closeRosterModal);
   document.getElementById('addAssocBtn').addEventListener('click', () => addAssociatedRow());
@@ -37,6 +49,10 @@ function initializeRoster() {
 }
 
 function loadCurrentWeek() {
+  if (rosterMode === 'monthly') {
+    loadMonth(new Date());
+    return;
+  }
   const now = new Date();
   const day = now.getDay();
   const diffToMonday = (day + 6) % 7;
@@ -51,11 +67,36 @@ function loadCurrentWeek() {
 
 function shiftWeek(days) {
   if (!rosterState.startDate) return;
+  if (rosterMode === 'monthly') {
+    const base = new Date(rosterState.startDate);
+    const newMonth = base.getMonth() + (days > 0 ? 1 : -1);
+    const newDate = new Date(base.getFullYear(), newMonth, 1);
+    loadMonth(newDate);
+    return;
+  }
   const start = new Date(rosterState.startDate);
   start.setDate(start.getDate() + days);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   loadRoster(start, end);
+}
+
+function loadMonth(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  loadRoster(start, end);
+}
+
+function handleMonthChange(event) {
+  const value = event.target.value;
+  if (!value) return;
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 2 || parts.some(n => Number.isNaN(n))) return;
+  const [year, month] = parts;
+  const date = new Date(year, month - 1, 1);
+  loadMonth(date);
 }
 
 function toDateString(date) {
@@ -80,12 +121,25 @@ function formatDayLabel(date) {
   });
 }
 
+function formatMonthLabel(date) {
+  return date.toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
 function setRosterMode(mode) {
   rosterMode = mode === 'monthly' ? 'monthly' : 'day';
   document.getElementById('dayModeBtn').classList.toggle('active', rosterMode === 'day');
   document.getElementById('monthModeBtn').classList.toggle('active', rosterMode === 'monthly');
+  updateModeControls();
   if (document.getElementById('rosterModal').classList.contains('active')) {
     applyModeFields();
+  }
+  if (rosterMode === 'monthly') {
+    loadMonth(rosterState.startDate || new Date());
+  } else {
+    loadCurrentWeek();
   }
 }
 
@@ -94,6 +148,27 @@ function openMonthlyReport() {
   const year = rosterState.startDate.getFullYear();
   const month = String(rosterState.startDate.getMonth() + 1).padStart(2, '0');
   window.location.href = `/reports?month=${year}-${month}`;
+}
+
+function updateModeControls() {
+  const monthPicker = document.getElementById('rosterMonthPicker');
+  const prevBtn = document.getElementById('prevWeekBtn');
+  const nextBtn = document.getElementById('nextWeekBtn');
+  const todayBtn = document.getElementById('todayBtn');
+
+  if (monthPicker) {
+    monthPicker.style.display = rosterMode === 'monthly' ? 'inline-flex' : 'none';
+  }
+
+  if (rosterMode === 'monthly') {
+    if (prevBtn) prevBtn.textContent = '◀';
+    if (nextBtn) nextBtn.textContent = '▶';
+    if (todayBtn) todayBtn.textContent = 'This Month';
+  } else {
+    if (prevBtn) prevBtn.textContent = '◀';
+    if (nextBtn) nextBtn.textContent = '▶';
+    if (todayBtn) todayBtn.textContent = 'Today';
+  }
 }
 
 async function loadRoster(start, end) {
@@ -113,12 +188,27 @@ async function loadRoster(start, end) {
     rosterState.days = buildDaysArray(start, end);
     rosterState.rows = result.data.rows || [];
     rosterState.guards = result.data.guards || [];
+    rosterState.clients = result.data.clients || [];
 
     document.getElementById('rosterRangeLabel').textContent = formatRangeLabel(start, end);
-    document.getElementById('totalHoursValue').textContent = (result.data.totalHours || 0).toFixed(2);
-    document.getElementById('confirmedCount').textContent = `Confirmed Shifts: ${result.data.confirmedShifts || 0}`;
-    document.getElementById('unconfirmedCount').textContent = `Unconfirmed Shifts: ${result.data.unconfirmedShifts || 0}`;
-    document.getElementById('unassignedCount').textContent = `Unassigned Shifts: ${result.data.unassignedShifts || 0}`;
+    const monthPicker = document.getElementById('rosterMonthPicker');
+    if (monthPicker) {
+      const monthValue = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+      monthPicker.value = monthValue;
+    }
+
+    if (rosterMode === 'monthly') {
+      const monthlyTotal = rosterState.rows.reduce((sum, row) => sum + (row.totalHoursTarget || 0), 0);
+      document.getElementById('totalHoursValue').textContent = monthlyTotal.toFixed(2);
+      document.getElementById('confirmedCount').textContent = 'Confirmed Shifts: 0';
+      document.getElementById('unconfirmedCount').textContent = 'Unconfirmed Shifts: 0';
+      document.getElementById('unassignedCount').textContent = 'Unassigned Shifts: 0';
+    } else {
+      document.getElementById('totalHoursValue').textContent = (result.data.totalHours || 0).toFixed(2);
+      document.getElementById('confirmedCount').textContent = `Confirmed Shifts: ${result.data.confirmedShifts || 0}`;
+      document.getElementById('unconfirmedCount').textContent = `Unconfirmed Shifts: ${result.data.unconfirmedShifts || 0}`;
+      document.getElementById('unassignedCount').textContent = `Unassigned Shifts: ${result.data.unassignedShifts || 0}`;
+    }
 
     renderRosterTable();
   } catch (error) {
@@ -152,6 +242,14 @@ function renderRosterHeader() {
     <th>Guard</th>
   `;
 
+  if (rosterMode === 'monthly') {
+    const th = document.createElement('th');
+    const label = rosterState.startDate ? formatMonthLabel(rosterState.startDate) : 'Month';
+    th.textContent = label;
+    headRow.appendChild(th);
+    return;
+  }
+
   rosterState.days.forEach(dayStr => {
     const [year, month, day] = dayStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
@@ -165,7 +263,17 @@ function renderRosterBody() {
   const tbody = document.getElementById('rosterBody');
 
   if (rosterState.rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${4 + rosterState.days.length}" style="text-align:center; padding:20px;">No roster data found</td></tr>`;
+    const colSpan = rosterMode === 'monthly' ? 5 : 4 + rosterState.days.length;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="${colSpan}" style="text-align:center; padding:20px;">
+          No roster rows found.
+          <button type="button" class="shift-action" id="emptyAddRowBtn" style="margin-left:10px;">Add Row</button>
+        </td>
+      </tr>
+    `;
+    const emptyBtn = document.getElementById('emptyAddRowBtn');
+    if (emptyBtn) emptyBtn.addEventListener('click', openRowModal);
     return;
   }
 
@@ -198,6 +306,62 @@ function renderRosterBody() {
     }
     tr.appendChild(guardCell);
 
+    if (rosterMode === 'monthly') {
+      const cell = document.createElement('td');
+      const cellContent = document.createElement('div');
+      cellContent.className = 'roster-cell';
+      cellContent.dataset.rowId = row.rowId;
+
+      const totalTarget = row.totalHoursTarget || 0;
+      const primaryTarget = row.primaryTargetHours || 0;
+
+      if (totalTarget <= 0) {
+        const empty = document.createElement('div');
+        empty.className = 'shift-empty';
+        empty.textContent = 'Add Monthly';
+        cellContent.appendChild(empty);
+      } else {
+        const primaryBox = document.createElement('div');
+        primaryBox.className = 'shift-box primary';
+        primaryBox.innerHTML = `
+          <div>${row.guardName || 'Primary Guard'}</div>
+          <div class="shift-hours">${primaryTarget.toFixed(2)}h</div>
+        `;
+        cellContent.appendChild(primaryBox);
+
+        (row.monthlyAssociatedTargets || []).forEach(assoc => {
+          const assocBox = document.createElement('div');
+          assocBox.className = 'shift-box associated';
+          assocBox.innerHTML = `
+            <div>${assoc.guardName || 'Associated Guard'}</div>
+            <div class="shift-hours">${(assoc.hours || 0).toFixed(2)}h</div>
+          `;
+          cellContent.appendChild(assocBox);
+        });
+      }
+
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'shift-action';
+      actionBtn.textContent = totalTarget > 0 ? 'Edit' : 'Add';
+      actionBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openRosterModal(row, rosterState.days[0] || toDateString(rosterState.startDate || new Date()));
+      });
+      cellContent.appendChild(actionBtn);
+
+      cell.appendChild(cellContent);
+      cellContent.addEventListener('click', (event) => {
+        event.preventDefault();
+        openRosterModal(row, rosterState.days[0] || toDateString(rosterState.startDate || new Date()));
+      });
+
+      tr.appendChild(cell);
+      tbody.appendChild(tr);
+      return;
+    }
+
     let cumulativePrimary = row.primaryHoursBeforeRange || 0;
 
     rosterState.days.forEach(dayStr => {
@@ -210,7 +374,7 @@ function renderRosterBody() {
 
       const cellContent = document.createElement('div');
       cellContent.className = 'roster-cell';
-      cellContent.dataset.payrollId = row.payrollId;
+      cellContent.dataset.rowId = row.rowId;
       cellContent.dataset.date = dayStr;
 
       if (!entry || (entry.totalHours || 0) === 0) {
@@ -490,7 +654,7 @@ function handleMonthlyPrimaryChange() {
 async function saveRosterEntry() {
   if (!currentModalContext) return;
 
-  const payrollId = currentModalContext.row.payrollId;
+  const rowId = currentModalContext.row.rowId;
   const notes = document.getElementById('rosterNotes').value || '';
 
   const assocList = document.getElementById('assocList');
@@ -511,7 +675,7 @@ async function saveRosterEntry() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          payrollId,
+          rowId,
           year,
           month,
           primaryHours,
@@ -532,7 +696,7 @@ async function saveRosterEntry() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          payrollId,
+          rowId,
           date,
           primaryHours,
           associated,
@@ -586,7 +750,7 @@ async function deleteRosterEntry() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        payrollId: currentModalContext.row.payrollId,
+        rowId: currentModalContext.row.rowId,
         date: currentModalContext.dateStr
       })
     });
@@ -601,6 +765,73 @@ async function deleteRosterEntry() {
   } catch (error) {
     console.error('Error deleting roster entry:', error);
     alert('Error deleting roster entry');
+  }
+}
+
+function openRowModal() {
+  currentRowEditId = null;
+  const rowModal = document.getElementById('rowModal');
+  if (!rowModal) return;
+
+  document.getElementById('rowModalTitle').textContent = 'Add Roster Row';
+  document.getElementById('rowSiteInput').value = '';
+  populateRowSelects();
+
+  rowModal.classList.add('active');
+}
+
+function closeRowModal() {
+  const rowModal = document.getElementById('rowModal');
+  if (rowModal) rowModal.classList.remove('active');
+  currentRowEditId = null;
+}
+
+function populateRowSelects() {
+  const clientSelect = document.getElementById('rowClientSelect');
+  const guardSelect = document.getElementById('rowGuardSelect');
+
+  if (clientSelect) {
+    clientSelect.innerHTML = '<option value="">Select Client</option>' +
+      rosterState.clients.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+  }
+
+  if (guardSelect) {
+    guardSelect.innerHTML = '<option value="">Select Guard</option>' +
+      rosterState.guards.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
+  }
+}
+
+async function saveRosterRow() {
+  const clientId = document.getElementById('rowClientSelect')?.value || '';
+  const guardId = document.getElementById('rowGuardSelect')?.value || '';
+  const siteName = document.getElementById('rowSiteInput')?.value || '';
+
+  if (!clientId || !guardId) {
+    alert('Please select both client and guard');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/roster/rows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId,
+        guardId,
+        siteName
+      })
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to create row');
+    }
+
+    closeRowModal();
+    loadRoster(rosterState.startDate || new Date(), rosterState.endDate || new Date());
+  } catch (error) {
+    console.error('Error creating roster row:', error);
+    alert('Error creating roster row');
   }
 }
 

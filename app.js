@@ -16,6 +16,7 @@ const Alert = require('./models/Alert');
 const Client = require('./models/Client');
 const RosterEntry = require('./models/RosterEntry');
 const RosterMonthlyTarget = require('./models/RosterMonthlyTarget');
+const RosterRow = require('./models/RosterRow');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
@@ -2181,49 +2182,89 @@ app.get('/api/roster', async (req, res) => {
     const monthStart = new Date(rosterYear, rosterMonth - 1, 1);
     const monthEnd = new Date(rosterYear, rosterMonth, 0, 23, 59, 59, 999);
 
-    const [payrolls, clients, guards, rosterEntries, monthlyTargets] = await Promise.all([
-      Payroll.find({})
-        .populate({ path: 'guardId', select: 'guardName associatedGuard' })
-        .sort({ clientName: 1, siteName: 1, guardName: 1 })
-        .lean(),
+    const [clients, guards] = await Promise.all([
       Client.find({}).select('name').lean(),
-      GuardMaster.find({ isActive: true }).select('guardName associatedGuard').lean(),
-      RosterEntry.find({ date: { $gte: monthStart, $lte: monthEnd } }).lean(),
-      RosterMonthlyTarget.find({ year: rosterYear, month: rosterMonth }).lean()
+      GuardMaster.find({ isActive: { $ne: false } }).select('guardName associatedGuard').lean()
     ]);
 
     const clientMap = new Map(
       clients.map(c => [String(c.name || '').toLowerCase(), c._id])
     );
 
-    const payrollIdSet = new Set(payrolls.map(p => p._id.toString()));
+    let rosterRows = await RosterRow.find({ active: { $ne: false } })
+      .sort({ clientName: 1, siteName: 1, guardName: 1 })
+      .lean();
+
+    if (rosterRows.length === 0 && guards.length > 0) {
+      const guardIds = guards.map(g => g._id);
+      const payrollSeeds = await Payroll.find({ guardId: { $in: guardIds } })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const guardSeedMap = new Map();
+      payrollSeeds.forEach(seed => {
+        const gid = seed.guardId ? seed.guardId.toString() : null;
+        if (gid && !guardSeedMap.has(gid)) {
+          guardSeedMap.set(gid, {
+            clientName: seed.clientName || '',
+            siteName: seed.siteName || '',
+            clientId: clientMap.get(String(seed.clientName || '').toLowerCase()) || null
+          });
+        }
+      });
+
+      const seedRows = guards.map(guard => {
+        const seed = guardSeedMap.get(guard._id.toString()) || {};
+        return {
+          clientId: seed.clientId || null,
+          clientName: seed.clientName || '',
+          siteName: seed.siteName || '',
+          guardId: guard._id,
+          guardName: guard.guardName || '',
+          active: true
+        };
+      });
+
+      await RosterRow.insertMany(seedRows);
+      rosterRows = await RosterRow.find({ active: { $ne: false } })
+        .sort({ clientName: 1, siteName: 1, guardName: 1 })
+        .lean();
+    }
+
+    const rowIdSet = new Set(rosterRows.map(r => r._id.toString()));
+
+    const [rosterEntries, monthlyTargets] = await Promise.all([
+      RosterEntry.find({ rosterRowId: { $in: Array.from(rowIdSet) }, date: { $gte: monthStart, $lte: monthEnd } }).lean(),
+      RosterMonthlyTarget.find({ rosterRowId: { $in: Array.from(rowIdSet) }, year: rosterYear, month: rosterMonth }).lean()
+    ]);
+
     const monthlyTargetMap = new Map(
-      monthlyTargets.map(target => [target.payrollId.toString(), target])
+      monthlyTargets.map(target => [target.rosterRowId.toString(), target])
     );
 
-    const entriesByPayroll = new Map();
+    const entriesByRow = new Map();
     let totalHoursRange = 0;
     let confirmedShifts = 0;
     let unconfirmedShifts = 0;
 
     rosterEntries.forEach(entry => {
-      const payrollId = entry.payrollId.toString();
-      if (!payrollIdSet.has(payrollId)) {
+      const rowId = entry.rosterRowId.toString();
+      if (!rowIdSet.has(rowId)) {
         return;
       }
 
       const primaryHours = entry.primary?.hours || 0;
       const totalHours = entry.totalHours || 0;
 
-      if (!entriesByPayroll.has(payrollId)) {
-        entriesByPayroll.set(payrollId, {
+      if (!entriesByRow.has(rowId)) {
+        entriesByRow.set(rowId, {
           byDate: {},
           primaryHoursBeforeRange: 0,
           primaryHoursMonth: 0
         });
       }
 
-      const bucket = entriesByPayroll.get(payrollId);
+      const bucket = entriesByRow.get(rowId);
       bucket.primaryHoursMonth += primaryHours;
 
       if (entry.dateString < startStr) {
@@ -2250,23 +2291,20 @@ app.get('/api/roster', async (req, res) => {
     });
 
     const dayCount = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    const totalCells = payrolls.length * dayCount;
-    const unassignedShifts = Math.max(totalCells - (confirmedShifts + unconfirmedShifts), 0);
+    const totalCells = rosterRows.length * dayCount;
+    const unassignedShifts = rosterRows.length === 0
+      ? 0
+      : Math.max(totalCells - (confirmedShifts + unconfirmedShifts), 0);
 
-    const rows = payrolls.map(payroll => {
-      const pid = payroll._id.toString();
-      const entryData = entriesByPayroll.get(pid) || {
+    const rows = rosterRows.map(row => {
+      const rid = row._id.toString();
+      const entryData = entriesByRow.get(rid) || {
         byDate: {},
         primaryHoursBeforeRange: 0,
         primaryHoursMonth: 0
       };
 
-      const clientId =
-        payroll.clientId ||
-        clientMap.get(String(payroll.clientName || '').toLowerCase()) ||
-        null;
-
-      const target = monthlyTargetMap.get(pid);
+      const target = monthlyTargetMap.get(rid);
       const associatedTargets = target?.associated || [];
       const monthlyPrimary = target?.primaryHours || 0;
       const monthlyAssociatedTotal = associatedTargets.reduce((sum, item) => sum + (item.hours || 0), 0);
@@ -2275,14 +2313,13 @@ app.get('/api/roster', async (req, res) => {
         : monthlyPrimary + monthlyAssociatedTotal;
 
       return {
-        payrollId: pid,
-        sid: pid.slice(-4).toUpperCase(),
-        clientName: payroll.clientName || '',
-        clientId: clientId,
-        siteName: payroll.siteName || '',
-        guardName: payroll.guardName || '',
-        guardId: payroll.guardId?._id || payroll.guardId || null,
-        associatedGuardId: payroll.guardId?.associatedGuard || null,
+        rowId: rid,
+        sid: rid.slice(-4).toUpperCase(),
+        clientName: row.clientName || '',
+        clientId: row.clientId || null,
+        siteName: row.siteName || '',
+        guardName: row.guardName || '',
+        guardId: row.guardId || null,
         totalHoursTarget: monthlyTotal || 0,
         primaryTargetHours: monthlyPrimary || 0,
         monthlyAssociatedTargets: associatedTargets,
@@ -2301,6 +2338,7 @@ app.get('/api/roster', async (req, res) => {
         confirmedShifts,
         unconfirmedShifts,
         unassignedShifts,
+        clients: clients,
         guards: guards,
         rows
       }
@@ -2316,24 +2354,137 @@ app.get('/api/roster', async (req, res) => {
 });
 
 /**
+ * POST /api/roster/rows - Create roster row
+ */
+app.post('/api/roster/rows', async (req, res) => {
+  try {
+    const { clientId, clientName, siteName, guardId, guardName } = req.body;
+
+    let resolvedClientName = clientName || '';
+    let resolvedGuardName = guardName || '';
+    let resolvedClientId = clientId || null;
+    let resolvedGuardId = guardId || null;
+
+    if (resolvedClientId) {
+      const client = await Client.findById(resolvedClientId).lean();
+      if (client) {
+        resolvedClientName = client.name || resolvedClientName;
+      }
+    }
+
+    if (resolvedGuardId) {
+      const guard = await GuardMaster.findById(resolvedGuardId).lean();
+      if (guard) {
+        resolvedGuardName = guard.guardName || resolvedGuardName;
+      }
+    }
+
+    const row = new RosterRow({
+      clientId: resolvedClientId,
+      clientName: resolvedClientName,
+      siteName: siteName || '',
+      guardId: resolvedGuardId,
+      guardName: resolvedGuardName,
+      active: true
+    });
+
+    await row.save();
+
+    res.json({
+      success: true,
+      message: 'Roster row created',
+      data: row
+    });
+  } catch (error) {
+    console.error('Error creating roster row:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating roster row',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/roster/rows/:id - Update roster row
+ */
+app.put('/api/roster/rows/:id', async (req, res) => {
+  try {
+    const { clientId, clientName, siteName, guardId, guardName, active } = req.body;
+
+    let updateData = {
+      siteName: siteName,
+      active: active
+    };
+
+    if (clientId !== undefined) {
+      updateData.clientId = clientId || null;
+      if (clientId) {
+        const client = await Client.findById(clientId).lean();
+        if (client) updateData.clientName = client.name || '';
+      } else {
+        updateData.clientName = clientName || '';
+      }
+    } else if (clientName !== undefined) {
+      updateData.clientName = clientName;
+    }
+
+    if (guardId !== undefined) {
+      updateData.guardId = guardId || null;
+      if (guardId) {
+        const guard = await GuardMaster.findById(guardId).lean();
+        if (guard) updateData.guardName = guard.guardName || '';
+      } else {
+        updateData.guardName = guardName || '';
+      }
+    } else if (guardName !== undefined) {
+      updateData.guardName = guardName;
+    }
+
+    const row = await RosterRow.findByIdAndUpdate(req.params.id, updateData, { new: true });
+
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: 'Roster row not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Roster row updated',
+      data: row
+    });
+  } catch (error) {
+    console.error('Error updating roster row:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating roster row',
+      error: error.message
+    });
+  }
+});
+
+/**
  * POST /api/roster/assign - Create/update roster entry
  */
 app.post('/api/roster/assign', async (req, res) => {
   try {
-    const { payrollId, date, primaryHours, associated, notes, status } = req.body;
+    const { rowId, payrollId, date, primaryHours, associated, notes, status } = req.body;
+    const rosterRowId = rowId || payrollId;
 
-    if (!payrollId || !date) {
+    if (!rosterRowId || !date) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: payrollId, date'
+        message: 'Missing required fields: rowId, date'
       });
     }
 
-    const payroll = await Payroll.findById(payrollId).populate('guardId', 'guardName');
-    if (!payroll) {
+    const rosterRow = await RosterRow.findById(rosterRowId);
+    if (!rosterRow) {
       return res.status(404).json({
         success: false,
-        message: 'Payroll record not found'
+        message: 'Roster row not found'
       });
     }
 
@@ -2371,15 +2522,16 @@ app.post('/api/roster/assign', async (req, res) => {
     }
 
     const updateData = {
-      payrollId: payrollId,
+      rosterRowId: rosterRowId,
+      payrollId: null,
       status: status === 'confirmed' ? 'confirmed' : 'unconfirmed',
       date: dateObj,
       dateString: dateString,
       year: dateObj.getFullYear(),
       month: dateObj.getMonth() + 1,
       primary: {
-        guardId: payroll.guardId?._id || payroll.guardId || null,
-        guardName: payroll.guardName || '',
+        guardId: rosterRow.guardId || null,
+        guardName: rosterRow.guardName || '',
         hours: primaryHoursValue
       },
       associated: associatedAssignments,
@@ -2388,7 +2540,7 @@ app.post('/api/roster/assign', async (req, res) => {
     };
 
     const entry = await RosterEntry.findOneAndUpdate(
-      { payrollId, dateString },
+      { rosterRowId, dateString },
       updateData,
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
@@ -2413,17 +2565,18 @@ app.post('/api/roster/assign', async (req, res) => {
  */
 app.post('/api/roster/delete', async (req, res) => {
   try {
-    const { payrollId, date } = req.body;
+    const { rowId, payrollId, date } = req.body;
+    const rosterRowId = rowId || payrollId;
 
-    if (!payrollId || !date) {
+    if (!rosterRowId || !date) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: payrollId, date'
+        message: 'Missing required fields: rowId, date'
       });
     }
 
     const deleted = await RosterEntry.findOneAndDelete({
-      payrollId,
+      rosterRowId,
       dateString: date
     });
 
@@ -2446,12 +2599,13 @@ app.post('/api/roster/delete', async (req, res) => {
  */
 app.post('/api/roster/monthly-target', async (req, res) => {
   try {
-    const { payrollId, year, month, primaryHours, associated, notes } = req.body;
+    const { rowId, payrollId, year, month, primaryHours, associated, notes } = req.body;
+    const rosterRowId = rowId || payrollId;
 
-    if (!payrollId || !year || !month) {
+    if (!rosterRowId || !year || !month) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: payrollId, year, month'
+        message: 'Missing required fields: rowId, year, month'
       });
     }
 
@@ -2469,7 +2623,7 @@ app.post('/api/roster/monthly-target', async (req, res) => {
     const totalHoursValue = primaryHoursValue + associatedAssignments.reduce((sum, item) => sum + (item.hours || 0), 0);
 
     if (totalHoursValue <= 0) {
-      await RosterMonthlyTarget.findOneAndDelete({ payrollId, year, month });
+      await RosterMonthlyTarget.findOneAndDelete({ rosterRowId, year, month });
       return res.json({
         success: true,
         message: 'Monthly target cleared'
@@ -2477,9 +2631,9 @@ app.post('/api/roster/monthly-target', async (req, res) => {
     }
 
     const target = await RosterMonthlyTarget.findOneAndUpdate(
-      { payrollId, year, month },
+      { rosterRowId, year, month },
       {
-        payrollId,
+        rosterRowId,
         year,
         month,
         primaryHours: primaryHoursValue,

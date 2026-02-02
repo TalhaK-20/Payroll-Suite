@@ -19,11 +19,16 @@ const rosterAssignmentSchema = new mongoose.Schema({
 }, { _id: false });
 
 const rosterEntrySchema = new mongoose.Schema({
+  rosterRowId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RosterRow',
+    required: true,
+    index: true
+  },
   payrollId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Payroll',
-    required: true,
-    index: true
+    default: null
   },
   status: {
     type: String,
@@ -66,6 +71,6 @@ const rosterEntrySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-rosterEntrySchema.index({ payrollId: 1, dateString: 1 }, { unique: true });
+rosterEntrySchema.index({ rosterRowId: 1, dateString: 1 }, { unique: true });
 
 module.exports = mongoose.model('RosterEntry', rosterEntrySchema);

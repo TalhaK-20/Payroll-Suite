@@ -218,6 +218,15 @@
       border: 1px solid #0f766e;
     }
 
+    .roster-month-picker {
+      border: 1px solid #cbd5f5;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #ffffff;
+      color: #0f172a;
+    }
+
     .status-toggle {
       display: flex;
       gap: 8px;
@@ -422,6 +431,8 @@
           <button id="prevWeekBtn">◀</button>
           <button id="todayBtn">Today</button>
           <button id="nextWeekBtn">▶</button>
+          <input type="month" id="rosterMonthPicker" class="roster-month-picker" style="display:none;">
+          <button id="addRowBtn" class="btn-outline" type="button">Add Row</button>
           <button id="reportBtn" class="btn-outline" type="button">Monthly Report</button>
           <div class="roster-summary">
             Total Hours: <span id="totalHoursValue">0</span>
@@ -531,6 +542,42 @@
         <button class="btn-danger" type="button" id="deleteRosterBtn" style="display: none;">Delete</button>
         <button class="btn-secondary" type="button" id="cancelRosterBtn">Cancel</button>
         <button class="btn-primary" type="button" id="saveRosterBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row Modal -->
+  <div id="rowModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="rowModalTitle">Add Roster Row</h3>
+        <button class="modal-close-btn" id="closeRowModal">x</button>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Client</label>
+          <select id="rowClientSelect"></select>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Guard</label>
+          <select id="rowGuardSelect"></select>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Site Name</label>
+          <input type="text" id="rowSiteInput" placeholder="Site Name">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" type="button" id="cancelRowBtn">Cancel</button>
+        <button class="btn-primary" type="button" id="saveRowBtn">Save</button>
       </div>
     </div>
   </div>

@@ -19,9 +19,9 @@ const monthlyAssignmentSchema = new mongoose.Schema({
 }, { _id: false });
 
 const rosterMonthlyTargetSchema = new mongoose.Schema({
-  payrollId: {
+  rosterRowId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Payroll',
+    ref: 'RosterRow',
     required: true,
     index: true
   },
@@ -54,6 +54,6 @@ const rosterMonthlyTargetSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-rosterMonthlyTargetSchema.index({ payrollId: 1, year: 1, month: 1 }, { unique: true });
+rosterMonthlyTargetSchema.index({ rosterRowId: 1, year: 1, month: 1 }, { unique: true });
 
 module.exports = mongoose.model('RosterMonthlyTarget', rosterMonthlyTargetSchema);
