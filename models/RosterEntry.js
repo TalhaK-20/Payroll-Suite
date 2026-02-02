@@ -15,6 +15,31 @@ const rosterAssignmentSchema = new mongoose.Schema({
     type: Number,
     min: 0,
     default: 0
+  },
+  status: {
+    type: String,
+    enum: ['confirmed', 'unconfirmed', 'unassigned', 'in-progress', 'incomplete'],
+    default: 'unconfirmed'
+  },
+  payRate: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  payAmount: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  chargeRate: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  chargeAmount: {
+    type: Number,
+    min: 0,
+    default: 0
   }
 }, { _id: false });
 
@@ -32,7 +57,7 @@ const rosterEntrySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['confirmed', 'unconfirmed'],
+    enum: ['confirmed', 'unconfirmed', 'unassigned', 'in-progress', 'incomplete'],
     default: 'unconfirmed',
     index: true
   },
@@ -61,6 +86,11 @@ const rosterEntrySchema = new mongoose.Schema({
   primary: rosterAssignmentSchema,
   associated: [rosterAssignmentSchema],
   totalHours: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  totalCharge: {
     type: Number,
     min: 0,
     default: 0

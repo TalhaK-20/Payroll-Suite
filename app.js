@@ -2187,51 +2187,16 @@ app.get('/api/roster', async (req, res) => {
       GuardMaster.find({ isActive: { $ne: false } }).select('guardName associatedGuard').lean()
     ]);
 
-    const clientMap = new Map(
-      clients.map(c => [String(c.name || '').toLowerCase(), c._id])
-    );
-
     let rosterRows = await RosterRow.find({ active: { $ne: false } })
       .sort({ clientName: 1, siteName: 1, guardName: 1 })
       .lean();
 
-    if (rosterRows.length === 0 && guards.length > 0) {
-      const guardIds = guards.map(g => g._id);
-      const payrollSeeds = await Payroll.find({ guardId: { $in: guardIds } })
-        .sort({ createdAt: -1 })
-        .lean();
+    const displayRows = rosterRows.filter(row =>
+      (row.clientId && row.clientId.toString()) ||
+      (row.clientName && row.clientName.trim())
+    );
 
-      const guardSeedMap = new Map();
-      payrollSeeds.forEach(seed => {
-        const gid = seed.guardId ? seed.guardId.toString() : null;
-        if (gid && !guardSeedMap.has(gid)) {
-          guardSeedMap.set(gid, {
-            clientName: seed.clientName || '',
-            siteName: seed.siteName || '',
-            clientId: clientMap.get(String(seed.clientName || '').toLowerCase()) || null
-          });
-        }
-      });
-
-      const seedRows = guards.map(guard => {
-        const seed = guardSeedMap.get(guard._id.toString()) || {};
-        return {
-          clientId: seed.clientId || null,
-          clientName: seed.clientName || '',
-          siteName: seed.siteName || '',
-          guardId: guard._id,
-          guardName: guard.guardName || '',
-          active: true
-        };
-      });
-
-      await RosterRow.insertMany(seedRows);
-      rosterRows = await RosterRow.find({ active: { $ne: false } })
-        .sort({ clientName: 1, siteName: 1, guardName: 1 })
-        .lean();
-    }
-
-    const rowIdSet = new Set(rosterRows.map(r => r._id.toString()));
+    const rowIdSet = new Set(displayRows.map(r => r._id.toString()));
 
     const [rosterEntries, monthlyTargets] = await Promise.all([
       RosterEntry.find({ rosterRowId: { $in: Array.from(rowIdSet) }, date: { $gte: monthStart, $lte: monthEnd } }).lean(),
@@ -2246,6 +2211,32 @@ app.get('/api/roster', async (req, res) => {
     let totalHoursRange = 0;
     let confirmedShifts = 0;
     let unconfirmedShifts = 0;
+    let inProgressShifts = 0;
+    let incompleteShifts = 0;
+    let unassignedEntryShifts = 0;
+
+    const statusPriority = ['in-progress', 'incomplete', 'unconfirmed', 'unassigned', 'confirmed'];
+    const normalizeStatus = (value) => statusPriority.includes(value) ? value : 'unconfirmed';
+    const resolveEntryStatus = (entry) => {
+      const fallback = normalizeStatus(entry.status || 'unconfirmed');
+      const statuses = [];
+      const primaryHours = entry.primary?.hours || 0;
+      if (primaryHours > 0) {
+        statuses.push(normalizeStatus(entry.primary?.status || fallback));
+      }
+      (entry.associated || []).forEach(assoc => {
+        if ((assoc.hours || 0) > 0) {
+          statuses.push(normalizeStatus(assoc.status || fallback));
+        }
+      });
+      if (statuses.length === 0) return fallback;
+      for (const status of statusPriority) {
+        if (statuses.includes(status)) {
+          return status;
+        }
+      }
+      return fallback;
+    };
 
     rosterEntries.forEach(entry => {
       const rowId = entry.rosterRowId.toString();
@@ -2255,6 +2246,7 @@ app.get('/api/roster', async (req, res) => {
 
       const primaryHours = entry.primary?.hours || 0;
       const totalHours = entry.totalHours || 0;
+      const entryStatus = resolveEntryStatus(entry);
 
       if (!entriesByRow.has(rowId)) {
         entriesByRow.set(rowId, {
@@ -2277,12 +2269,20 @@ app.get('/api/roster', async (req, res) => {
           associated: entry.associated || [],
           totalHours: totalHours,
           notes: entry.notes || '',
-          status: entry.status || 'unconfirmed'
+          status: entryStatus
         };
         totalHoursRange += totalHours;
         if (totalHours > 0) {
-          if (entry.status === 'confirmed') {
+          if (entryStatus === 'confirmed') {
             confirmedShifts += 1;
+          } else if (entryStatus === 'unconfirmed') {
+            unconfirmedShifts += 1;
+          } else if (entryStatus === 'in-progress') {
+            inProgressShifts += 1;
+          } else if (entryStatus === 'incomplete') {
+            incompleteShifts += 1;
+          } else if (entryStatus === 'unassigned') {
+            unassignedEntryShifts += 1;
           } else {
             unconfirmedShifts += 1;
           }
@@ -2291,12 +2291,12 @@ app.get('/api/roster', async (req, res) => {
     });
 
     const dayCount = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    const totalCells = rosterRows.length * dayCount;
-    const unassignedShifts = rosterRows.length === 0
-      ? 0
-      : Math.max(totalCells - (confirmedShifts + unconfirmedShifts), 0);
+    const totalCells = displayRows.length * dayCount;
+    const assignedCells = confirmedShifts + unconfirmedShifts + inProgressShifts + incompleteShifts + unassignedEntryShifts;
+    const emptyCells = displayRows.length === 0 ? 0 : Math.max(totalCells - assignedCells, 0);
+    const unassignedShifts = emptyCells + unassignedEntryShifts;
 
-    const rows = rosterRows.map(row => {
+    const rows = displayRows.map(row => {
       const rid = row._id.toString();
       const entryData = entriesByRow.get(rid) || {
         byDate: {},
@@ -2337,6 +2337,8 @@ app.get('/api/roster', async (req, res) => {
         totalHours: totalHoursRange,
         confirmedShifts,
         unconfirmedShifts,
+        inProgressShifts,
+        incompleteShifts,
         unassignedShifts,
         clients: clients,
         guards: guards,
@@ -2470,7 +2472,17 @@ app.put('/api/roster/rows/:id', async (req, res) => {
  */
 app.post('/api/roster/assign', async (req, res) => {
   try {
-    const { rowId, payrollId, date, primaryHours, associated, notes, status } = req.body;
+    const {
+      rowId,
+      payrollId,
+      date,
+      primaryHours,
+      associated,
+      notes,
+      status,
+      primaryStatus,
+      primaryChargeRate
+    } = req.body;
     const rosterRowId = rowId || payrollId;
 
     if (!rosterRowId || !date) {
@@ -2498,14 +2510,21 @@ app.post('/api/roster/assign', async (req, res) => {
 
     const dateString = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
+    const statusOptions = ['confirmed', 'unconfirmed', 'unassigned', 'in-progress', 'incomplete'];
+    const normalizeStatus = (value) => statusOptions.includes(value) ? value : 'unconfirmed';
+
     const primaryHoursValue = parseFloat(primaryHours) || 0;
+    const primaryStatusValue = normalizeStatus(primaryStatus || status);
+    const primaryChargeRateValue = parseFloat(primaryChargeRate) || 0;
 
     const associatedAssignments = Array.isArray(associated)
       ? associated
           .map(item => ({
             guardId: item.guardId || null,
             guardName: item.guardName || '',
-            hours: parseFloat(item.hours) || 0
+            hours: parseFloat(item.hours) || 0,
+            status: normalizeStatus(item.status),
+            chargeRate: parseFloat(item.chargeRate) || 0
           }))
           .filter(item => item.hours > 0)
       : [];
@@ -2513,7 +2532,7 @@ app.post('/api/roster/assign', async (req, res) => {
     const totalHoursValue = primaryHoursValue + associatedAssignments.reduce((sum, item) => sum + (item.hours || 0), 0);
 
     if (totalHoursValue <= 0) {
-      await RosterEntry.findOneAndDelete({ payrollId, dateString });
+      await RosterEntry.findOneAndDelete({ rosterRowId, dateString });
       return res.json({
         success: true,
         message: 'Roster entry cleared',
@@ -2521,10 +2540,67 @@ app.post('/api/roster/assign', async (req, res) => {
       });
     }
 
+    const guardIds = [];
+    if (rosterRow.guardId) {
+      guardIds.push(rosterRow.guardId.toString());
+    }
+    associatedAssignments.forEach(item => {
+      if (item.guardId) {
+        guardIds.push(item.guardId.toString());
+      }
+    });
+    const uniqueGuardIds = [...new Set(guardIds)];
+
+    const payrollRates = uniqueGuardIds.length > 0
+      ? await Payroll.find({ guardId: { $in: uniqueGuardIds } })
+        .sort({ createdAt: -1 })
+        .select('guardId payRate chargeRate')
+        .lean()
+      : [];
+
+    const payRateMap = new Map();
+    const chargeRateMap = new Map();
+    payrollRates.forEach(record => {
+      const gid = record.guardId ? record.guardId.toString() : null;
+      if (!gid || payRateMap.has(gid)) return;
+      payRateMap.set(gid, parseFloat(record.payRate) || 0);
+      chargeRateMap.set(gid, parseFloat(record.chargeRate) || 0);
+    });
+
+    const primaryPayRate = rosterRow.guardId ? (payRateMap.get(rosterRow.guardId.toString()) || 0) : 0;
+    const primaryPayAmount = primaryHoursValue * primaryPayRate;
+    const primaryChargeAmount = primaryHoursValue * primaryChargeRateValue;
+
+    const enrichedAssociated = associatedAssignments.map(item => {
+      const rate = item.guardId ? (payRateMap.get(item.guardId.toString()) || 0) : 0;
+      const chargeRateValue = item.chargeRate || 0;
+      return {
+        guardId: item.guardId,
+        guardName: item.guardName || '',
+        hours: item.hours,
+        status: item.status,
+        payRate: rate,
+        payAmount: item.hours * rate,
+        chargeRate: chargeRateValue,
+        chargeAmount: item.hours * chargeRateValue
+      };
+    });
+
+    const statusCandidates = [];
+    if (primaryHoursValue > 0) statusCandidates.push(primaryStatusValue);
+    enrichedAssociated.forEach(item => {
+      if (item.hours > 0) statusCandidates.push(item.status);
+    });
+    const statusPriority = ['in-progress', 'incomplete', 'unconfirmed', 'unassigned', 'confirmed'];
+    const entryStatus = statusCandidates.length === 0
+      ? normalizeStatus(status)
+      : statusPriority.find(item => statusCandidates.includes(item)) || normalizeStatus(status);
+    const totalChargeValue = primaryChargeAmount + enrichedAssociated.reduce((sum, item) => sum + (item.chargeAmount || 0), 0);
+
     const updateData = {
       rosterRowId: rosterRowId,
       payrollId: null,
-      status: status === 'confirmed' ? 'confirmed' : 'unconfirmed',
+      status: entryStatus,
       date: dateObj,
       dateString: dateString,
       year: dateObj.getFullYear(),
@@ -2532,10 +2608,16 @@ app.post('/api/roster/assign', async (req, res) => {
       primary: {
         guardId: rosterRow.guardId || null,
         guardName: rosterRow.guardName || '',
-        hours: primaryHoursValue
+        hours: primaryHoursValue,
+        status: primaryStatusValue,
+        payRate: primaryPayRate,
+        payAmount: primaryPayAmount,
+        chargeRate: primaryChargeRateValue,
+        chargeAmount: primaryChargeAmount
       },
-      associated: associatedAssignments,
+      associated: enrichedAssociated,
       totalHours: totalHoursValue,
+      totalCharge: totalChargeValue,
       notes: notes || ''
     };
 
@@ -2654,6 +2736,188 @@ app.post('/api/roster/monthly-target', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error saving monthly target',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/roster/row-payroll-pdf - Generate payroll PDF for a roster row within a date range
+ */
+app.post('/api/roster/row-payroll-pdf', async (req, res) => {
+  try {
+    const { rowId, start, end } = req.body;
+
+    const parseDate = (value) => {
+      if (!value || typeof value !== 'string') return null;
+      const parts = value.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return null;
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
+
+    if (!rowId || !start || !end) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: rowId, start, end'
+      });
+    }
+
+    const startDate = parseDate(start);
+    const endDate = parseDate(end);
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date range'
+      });
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    const rosterRow = await RosterRow.findById(rowId).lean();
+    if (!rosterRow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Roster row not found'
+      });
+    }
+
+    const entries = await RosterEntry.find({
+      rosterRowId: rowId,
+      date: { $gte: startDate, $lte: endDate }
+    }).lean();
+
+    if (!entries || entries.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No roster entries found for this period'
+      });
+    }
+
+    const guardIds = new Set();
+    if (rosterRow.guardId) {
+      guardIds.add(rosterRow.guardId.toString());
+    }
+    entries.forEach(entry => {
+      if (entry.primary?.guardId) {
+        guardIds.add(entry.primary.guardId.toString());
+      }
+      (entry.associated || []).forEach(assoc => {
+        if (assoc.guardId) guardIds.add(assoc.guardId.toString());
+      });
+    });
+
+    const payrollRates = guardIds.size > 0
+      ? await Payroll.find({ guardId: { $in: Array.from(guardIds) } })
+        .sort({ createdAt: -1 })
+        .select('guardId payRate chargeRate')
+        .lean()
+      : [];
+
+    const payRateMap = new Map();
+    const chargeRateMap = new Map();
+    payrollRates.forEach(record => {
+      const gid = record.guardId ? record.guardId.toString() : null;
+      if (!gid || payRateMap.has(gid)) return;
+      payRateMap.set(gid, parseFloat(record.payRate) || 0);
+      chargeRateMap.set(gid, parseFloat(record.chargeRate) || 0);
+    });
+
+    let primaryHours = 0;
+    let primaryPay = 0;
+    let primaryPayRate = 0;
+    let associatedHours = 0;
+    let associatedPay = 0;
+    const associatedNames = new Set();
+    const associatedTotals = new Map();
+
+    entries.forEach(entry => {
+      const pHours = entry.primary?.hours || 0;
+      const fallbackPrimaryRate = entry.primary?.guardId
+        ? (payRateMap.get(entry.primary.guardId.toString()) || 0)
+        : 0;
+      const pRate = entry.primary?.payRate || fallbackPrimaryRate;
+      const pPay = entry.primary?.payAmount || (pHours * pRate);
+
+      primaryHours += pHours;
+      primaryPay += pPay;
+      if (!primaryPayRate && pRate > 0) primaryPayRate = pRate;
+
+      (entry.associated || []).forEach(assoc => {
+        const hours = assoc.hours || 0;
+        if (hours <= 0) return;
+        const fallbackRate = assoc.guardId
+          ? (payRateMap.get(assoc.guardId.toString()) || 0)
+          : 0;
+        const rate = assoc.payRate || fallbackRate;
+        const pay = assoc.payAmount || (hours * rate);
+
+        associatedHours += hours;
+        associatedPay += pay;
+        if (assoc.guardName) associatedNames.add(assoc.guardName);
+
+        const key = assoc.guardId ? assoc.guardId.toString() : assoc.guardName || 'associated';
+        const current = associatedTotals.get(key) || {
+          guardName: assoc.guardName || 'Associated Guard',
+          hours: 0,
+          payRate: rate,
+          payAmount: 0
+        };
+        current.hours += hours;
+        current.payAmount += pay;
+        if (!current.payRate && rate > 0) current.payRate = rate;
+        associatedTotals.set(key, current);
+      });
+    });
+
+    if (!primaryPayRate && primaryHours > 0) {
+      primaryPayRate = primaryPay / primaryHours;
+    }
+
+    const totalHoursDecimal = primaryHours + associatedHours;
+    let totalHours = Math.floor(totalHoursDecimal);
+    let totalMinutes = Math.round((totalHoursDecimal - totalHours) * 60);
+    if (totalMinutes === 60) {
+      totalHours += 1;
+      totalMinutes = 0;
+    }
+
+    const totalPay = primaryPay + associatedPay;
+    const associatedNameLabel = associatedNames.size > 0
+      ? Array.from(associatedNames).join(', ')
+      : '';
+
+    const payrollData = {
+      clientName: rosterRow.clientName || '',
+      siteName: rosterRow.siteName || '',
+      guardName: rosterRow.guardName || '',
+      guardId: rosterRow.guardId || null,
+      payRate: primaryPayRate || (rosterRow.guardId ? (payRateMap.get(rosterRow.guardId.toString()) || 0) : 0),
+      chargeRate: rosterRow.guardId ? (chargeRateMap.get(rosterRow.guardId.toString()) || 0) : 0,
+      totalHours,
+      totalMinutes,
+      hoursDistribution: {
+        primaryGuardHours: primaryHours,
+        associatedGuardHours: associatedHours,
+        associatedGuardId: { guardName: associatedNameLabel }
+      },
+      pay1: totalPay,
+      totalPayOverride: totalPay,
+      primaryPayAmount: primaryPay,
+      associatedPayAmount: associatedPay,
+      associatedPayDetails: Array.from(associatedTotals.values())
+    };
+
+    const pdfBuffer = await pdfGenerator.generatePayrollPDF(payrollData, 1);
+    const safeName = (rosterRow.guardName || 'guard').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=payroll-${safeName}-${start}-to-${end}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating roster payroll PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generating roster payroll PDF',
       error: error.message
     });
   }

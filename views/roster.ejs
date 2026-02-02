@@ -49,9 +49,11 @@
       color: white;
     }
 
-    .chip-confirmed { background: #16a34a; }
-    .chip-unconfirmed { background: #dc2626; }
-    .chip-unassigned { background: #1d4ed8; }
+    .chip-confirmed { background: #f59e0b; color: #111827; }
+    .chip-unconfirmed { background: #ef4444; }
+    .chip-unassigned { background: #2563eb; }
+    .chip-inprogress { background: #16a34a; }
+    .chip-incomplete { background: #6b7280; }
 
     .roster-controls {
       display: flex;
@@ -148,21 +150,47 @@
       font-size: 0.78rem;
     }
 
-    .shift-box.primary {
+    .shift-box.primary:not(.status-confirmed):not(.status-unconfirmed):not(.status-unassigned):not(.status-in-progress):not(.status-incomplete) {
       background: #0f766e;
     }
 
     .shift-box.primary.complete {
+      border: 2px solid #16a34a;
+    }
+
+    .shift-box.associated:not(.status-confirmed):not(.status-unconfirmed):not(.status-unassigned):not(.status-in-progress):not(.status-incomplete) {
+      background: #0ea5e9;
+    }
+
+    .shift-box.status-confirmed {
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .shift-box.status-unconfirmed {
+      background: #ef4444;
+    }
+
+    .shift-box.status-unassigned {
+      background: #2563eb;
+    }
+
+    .shift-box.status-in-progress {
       background: #16a34a;
     }
 
-    .shift-box.associated {
-      background: #0ea5e9;
+    .shift-box.status-incomplete {
+      background: #6b7280;
     }
 
     .shift-hours {
       font-weight: 600;
       font-size: 0.75rem;
+    }
+
+    .shift-status {
+      font-size: 0.7rem;
+      opacity: 0.9;
     }
 
     .shift-empty {
@@ -230,7 +258,9 @@
     .status-toggle {
       display: flex;
       gap: 8px;
+      align-items: center;
       margin-bottom: 10px;
+      flex-wrap: wrap;
     }
 
     .status-toggle button {
@@ -244,9 +274,33 @@
     }
 
     .status-toggle button.active {
-      border-color: #0f766e;
-      background: #0f766e;
       color: #ffffff;
+    }
+
+    .status-toggle button.status-confirmed.active {
+      border-color: #f59e0b;
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .status-toggle button.status-unconfirmed.active {
+      border-color: #ef4444;
+      background: #ef4444;
+    }
+
+    .status-toggle button.status-unassigned.active {
+      border-color: #2563eb;
+      background: #2563eb;
+    }
+
+    .status-toggle button.status-in-progress.active {
+      border-color: #16a34a;
+      background: #16a34a;
+    }
+
+    .status-toggle button.status-incomplete.active {
+      border-color: #6b7280;
+      background: #6b7280;
     }
 
     .modal-actions .btn-danger {
@@ -263,21 +317,54 @@
       align-items: center;
       justify-content: center;
       z-index: 2000;
+      opacity: 0;
+      transition: opacity 0.25s ease;
     }
 
     .modal.active {
       display: flex;
+      opacity: 1;
     }
 
     .modal-content {
       background: white;
-      padding: 20px;
+      padding: 24px;
       border-radius: 10px;
       width: 100%;
-      max-width: 620px;
+      max-width: 720px;
       max-height: 90vh;
       overflow-y: auto;
       position: relative;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+      transform: translateY(12px) scale(0.98);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+
+    .modal.active .modal-content {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+
+    #rosterModal * {
+      box-sizing: border-box;
+    }
+
+    @keyframes modalFadeSlide {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal.active .modal-content .modal-header,
+    .modal.active .modal-content .status-toggle,
+    .modal.active .modal-content .form-row {
+      animation: modalFadeSlide 0.35s ease;
     }
 
     .modal-header {
@@ -292,12 +379,13 @@
       background: transparent;
       font-size: 1.2rem;
       cursor: pointer;
+      color: #64748b;
     }
 
     .form-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
       margin-bottom: 12px;
     }
 
@@ -320,27 +408,177 @@
       border: 1px solid #d1d5db;
       border-radius: 6px;
       font-size: 0.9rem;
+      background: #ffffff;
     }
 
     .assoc-list {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       margin-bottom: 8px;
     }
 
     .assoc-row {
       display: grid;
-      grid-template-columns: 1.5fr 1fr auto;
-      gap: 8px;
+      grid-template-columns: minmax(160px, 1.4fr) minmax(90px, 0.7fr) minmax(110px, 0.8fr) minmax(120px, 0.9fr) minmax(240px, 1.2fr) auto;
+      gap: 10px;
       align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .assoc-header {
+      display: grid;
+      grid-template-columns: minmax(160px, 1.4fr) minmax(90px, 0.7fr) minmax(110px, 0.8fr) minmax(120px, 0.9fr) minmax(240px, 1.2fr) auto;
+      gap: 10px;
+      font-size: 0.7rem;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 4px 6px 4px;
+    }
+
+    .assoc-header span {
+      padding-left: 2px;
+    }
+
+    .assoc-row select,
+    .assoc-row input {
+      width: 100%;
+      height: 34px;
+    }
+
+    .assoc-status-toggle button {
+      height: 30px;
+    }
+
+    .assoc-status-toggle {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .assoc-status-toggle button {
+      border: 1px solid #cbd5f5;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .assoc-status-toggle button.active {
+      color: #ffffff;
+    }
+
+    .assoc-status-toggle button.status-confirmed.active {
+      border-color: #f59e0b;
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .assoc-status-toggle button.status-unconfirmed.active {
+      border-color: #ef4444;
+      background: #ef4444;
+    }
+
+    .assoc-status-toggle button.status-unassigned.active {
+      border-color: #2563eb;
+      background: #2563eb;
+    }
+
+    .assoc-status-toggle button.status-in-progress.active {
+      border-color: #16a34a;
+      background: #16a34a;
+    }
+
+    .assoc-status-toggle button.status-incomplete.active {
+      border-color: #6b7280;
+      background: #6b7280;
+    }
+
+    .status-label {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.85rem;
+      margin-right: 6px;
+    }
+
+    .charge-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .charge-summary input {
+      max-width: 140px;
+      text-align: right;
+      background: #ffffff;
+    }
+
+    .charge-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .charge-summary-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .charge-summary-label {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .charge-summary-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .charge-summary-item.total .charge-summary-value {
+      color: #0f766e;
+    }
+
+    #rosterModal[data-mode="monthly"] .assoc-charge-rate,
+    #rosterModal[data-mode="monthly"] .assoc-charge-amount,
+    #rosterModal[data-mode="monthly"] .assoc-header .charge-col {
+      display: none;
+    }
+
+    #rosterModal[data-mode="monthly"] .assoc-header,
+    #rosterModal[data-mode="monthly"] .assoc-row {
+      grid-template-columns: minmax(160px, 1.4fr) minmax(90px, 0.7fr) minmax(240px, 1.2fr) auto;
     }
 
     .assoc-remove {
       border: none;
       background: #ef4444;
       color: white;
-      padding: 6px 8px;
+      padding: 7px 10px;
       border-radius: 6px;
       cursor: pointer;
     }
@@ -385,6 +623,14 @@
       .form-row {
         grid-template-columns: 1fr;
       }
+
+      .assoc-header {
+        display: none;
+      }
+
+      .assoc-row {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -421,6 +667,8 @@
           <span class="roster-chip chip-confirmed" id="confirmedCount">Confirmed Shifts: 0</span>
           <span class="roster-chip chip-unconfirmed" id="unconfirmedCount">Unconfirmed Shifts: 0</span>
           <span class="roster-chip chip-unassigned" id="unassignedCount">Unassigned Shifts: 0</span>
+          <span class="roster-chip chip-inprogress" id="inProgressCount">In Progress: 0</span>
+          <span class="roster-chip chip-incomplete" id="incompleteCount">Incomplete: 0</span>
         </div>
 
         <div class="roster-controls">
@@ -448,6 +696,7 @@
               <th>SID</th>
               <th>Site Name</th>
               <th>Guard</th>
+              <th>Payroll</th>
               <!-- Day columns inserted via JS -->
             </tr>
           </thead>
@@ -467,9 +716,13 @@
         <button class="modal-close-btn" id="closeRosterModal">✕</button>
       </div>
 
-      <div class="status-toggle" id="statusToggle">
-        <button type="button" id="statusConfirmedBtn">Confirmed Shift</button>
-        <button type="button" id="statusUnconfirmedBtn">Unconfirmed Shift</button>
+      <div class="status-toggle" id="primaryStatusToggle">
+        <span class="status-label">Primary Status:</span>
+        <button type="button" class="status-btn status-confirmed" data-status="confirmed">Confirmed Shift</button>
+        <button type="button" class="status-btn status-unconfirmed" data-status="unconfirmed">Unconfirmed Shift</button>
+        <button type="button" class="status-btn status-unassigned" data-status="unassigned">Unassigned Shift</button>
+        <button type="button" class="status-btn status-in-progress" data-status="in-progress">In Progress</button>
+        <button type="button" class="status-btn status-incomplete" data-status="incomplete">Incomplete</button>
       </div>
 
       <div class="form-row full">
@@ -501,6 +754,17 @@
         </div>
       </div>
 
+      <div class="form-row day-fields">
+        <div>
+          <label>Primary Charge Rate (per hour)</label>
+          <input type="number" id="primaryChargeRateInput" min="0" step="0.01">
+        </div>
+        <div>
+          <label>Primary Charge Amount</label>
+          <input type="text" id="primaryChargeAmount" readonly style="background: #f8fafc;">
+        </div>
+      </div>
+
       <div class="form-row monthly-fields" style="display: none;">
         <div>
           <label>Roster Month</label>
@@ -526,8 +790,45 @@
       <div class="form-row full">
         <div>
           <label>Associated Guards</label>
+          <div class="assoc-header">
+            <span>Guard</span>
+            <span>Hours</span>
+            <span class="charge-col">Charge Rate</span>
+            <span class="charge-col">Charge Amount</span>
+            <span>Status</span>
+            <span>Action</span>
+          </div>
           <div class="assoc-list" id="assocList"></div>
           <button class="btn-secondary" type="button" id="addAssocBtn">+ Add Associated Guard</button>
+        </div>
+      </div>
+
+      <div class="form-row full day-fields">
+        <div class="charge-summary-grid">
+          <div class="charge-summary-item">
+            <span class="charge-summary-label">Primary Hours</span>
+            <span class="charge-summary-value" id="primaryHoursTotalValue">0.00</span>
+          </div>
+          <div class="charge-summary-item">
+            <span class="charge-summary-label">Associated Hours</span>
+            <span class="charge-summary-value" id="associatedHoursTotalValue">0.00</span>
+          </div>
+          <div class="charge-summary-item">
+            <span class="charge-summary-label">Total Hours</span>
+            <span class="charge-summary-value" id="totalHoursSummaryValue">0.00</span>
+          </div>
+          <div class="charge-summary-item">
+            <span class="charge-summary-label">Primary Charge</span>
+            <span class="charge-summary-value" id="primaryChargeTotalValue">£0.00</span>
+          </div>
+          <div class="charge-summary-item">
+            <span class="charge-summary-label">Associated Charge</span>
+            <span class="charge-summary-value" id="associatedChargeTotalValue">£0.00</span>
+          </div>
+          <div class="charge-summary-item total">
+            <span class="charge-summary-label">Payment Total</span>
+            <span class="charge-summary-value" id="totalChargeValue">£0.00</span>
+          </div>
         </div>
       </div>
 

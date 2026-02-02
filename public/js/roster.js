@@ -9,8 +9,36 @@
 
 let currentModalContext = null;
 let rosterMode = 'day';
-let currentEntryStatus = 'unconfirmed';
+let currentPrimaryStatus = 'unconfirmed';
 let currentRowEditId = null;
+
+const STATUS_OPTIONS = [
+  { value: 'confirmed', label: 'Confirmed', className: 'status-confirmed' },
+  { value: 'unconfirmed', label: 'Unconfirmed', className: 'status-unconfirmed' },
+  { value: 'unassigned', label: 'Unassigned', className: 'status-unassigned' },
+  { value: 'in-progress', label: 'In Progress', className: 'status-in-progress' },
+  { value: 'incomplete', label: 'Incomplete', className: 'status-incomplete' }
+];
+
+function normalizeStatus(value) {
+  const match = STATUS_OPTIONS.find(option => option.value === value);
+  return match ? match.value : 'unconfirmed';
+}
+
+function statusToClass(value) {
+  const statusValue = normalizeStatus(value);
+  return `status-${statusValue}`;
+}
+
+function statusToLabel(value) {
+  const option = STATUS_OPTIONS.find(item => item.value === value);
+  return option ? option.label : 'Unconfirmed';
+}
+
+function formatCurrency(value) {
+  const amount = Number(value) || 0;
+  return `£${amount.toFixed(2)}`;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeRoster();
@@ -38,10 +66,18 @@ function initializeRoster() {
   document.getElementById('addAssocBtn').addEventListener('click', () => addAssociatedRow());
   document.getElementById('saveRosterBtn').addEventListener('click', saveRosterEntry);
   document.getElementById('deleteRosterBtn').addEventListener('click', deleteRosterEntry);
-  document.getElementById('statusConfirmedBtn').addEventListener('click', () => setEntryStatus('confirmed'));
-  document.getElementById('statusUnconfirmedBtn').addEventListener('click', () => setEntryStatus('unconfirmed'));
+  const primaryStatusToggle = document.getElementById('primaryStatusToggle');
+  if (primaryStatusToggle) {
+    primaryStatusToggle.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-status]');
+      if (!button) return;
+      setPrimaryStatus(button.dataset.status);
+    });
+  }
   document.getElementById('totalHoursInput').addEventListener('input', handleTotalHoursChange);
   document.getElementById('primaryHoursInput').addEventListener('input', handlePrimaryHoursChange);
+  const primaryChargeRateInput = document.getElementById('primaryChargeRateInput');
+  if (primaryChargeRateInput) primaryChargeRateInput.addEventListener('input', updateChargeAmounts);
   document.getElementById('monthlyTotalHoursInput').addEventListener('input', handleMonthlyTotalChange);
   document.getElementById('monthlyPrimaryHoursInput').addEventListener('input', handleMonthlyPrimaryChange);
 
@@ -202,11 +238,15 @@ async function loadRoster(start, end) {
       document.getElementById('totalHoursValue').textContent = monthlyTotal.toFixed(2);
       document.getElementById('confirmedCount').textContent = 'Confirmed Shifts: 0';
       document.getElementById('unconfirmedCount').textContent = 'Unconfirmed Shifts: 0';
+      document.getElementById('inProgressCount').textContent = 'In Progress: 0';
+      document.getElementById('incompleteCount').textContent = 'Incomplete: 0';
       document.getElementById('unassignedCount').textContent = 'Unassigned Shifts: 0';
     } else {
       document.getElementById('totalHoursValue').textContent = (result.data.totalHours || 0).toFixed(2);
       document.getElementById('confirmedCount').textContent = `Confirmed Shifts: ${result.data.confirmedShifts || 0}`;
       document.getElementById('unconfirmedCount').textContent = `Unconfirmed Shifts: ${result.data.unconfirmedShifts || 0}`;
+      document.getElementById('inProgressCount').textContent = `In Progress: ${result.data.inProgressShifts || 0}`;
+      document.getElementById('incompleteCount').textContent = `Incomplete: ${result.data.incompleteShifts || 0}`;
       document.getElementById('unassignedCount').textContent = `Unassigned Shifts: ${result.data.unassignedShifts || 0}`;
     }
 
@@ -214,7 +254,9 @@ async function loadRoster(start, end) {
   } catch (error) {
     console.error('Error loading roster:', error);
     const tbody = document.getElementById('rosterBody');
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#dc2626;">Error loading roster</td></tr>`;
+    const fallbackDays = rosterState.days?.length || 7;
+    const colSpan = rosterMode === 'monthly' ? 6 : 5 + fallbackDays;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:20px; color:#dc2626;">Error loading roster</td></tr>`;
   }
 }
 
@@ -240,6 +282,7 @@ function renderRosterHeader() {
     <th>SID</th>
     <th>Site Name</th>
     <th>Guard</th>
+    <th>Payroll</th>
   `;
 
   if (rosterMode === 'monthly') {
@@ -263,7 +306,7 @@ function renderRosterBody() {
   const tbody = document.getElementById('rosterBody');
 
   if (rosterState.rows.length === 0) {
-    const colSpan = rosterMode === 'monthly' ? 5 : 4 + rosterState.days.length;
+    const colSpan = rosterMode === 'monthly' ? 6 : 5 + rosterState.days.length;
     tbody.innerHTML = `
       <tr>
         <td colspan="${colSpan}" style="text-align:center; padding:20px;">
@@ -305,6 +348,18 @@ function renderRosterBody() {
       guardCell.textContent = row.guardName || '-';
     }
     tr.appendChild(guardCell);
+
+    const pdfCell = document.createElement('td');
+    const pdfBtn = document.createElement('button');
+    pdfBtn.type = 'button';
+    pdfBtn.className = 'shift-action';
+    pdfBtn.textContent = 'PDF';
+    pdfBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      generateRosterPDF(row);
+    });
+    pdfCell.appendChild(pdfBtn);
+    tr.appendChild(pdfCell);
 
     if (rosterMode === 'monthly') {
       const cell = document.createElement('td');
@@ -385,21 +440,27 @@ function renderRosterBody() {
       } else {
         const primaryBox = document.createElement('div');
         primaryBox.className = 'shift-box primary';
+        const primaryStatus = entry?.primary?.status || entry?.status || 'unconfirmed';
+        primaryBox.classList.add(statusToClass(primaryStatus));
         if (row.primaryTargetHours > 0 && cumulativePrimary >= row.primaryTargetHours) {
           primaryBox.classList.add('complete');
         }
         primaryBox.innerHTML = `
           <div>${row.guardName || entry.primary?.guardName || 'Primary Guard'}</div>
           <div class="shift-hours">${primaryHours.toFixed(2)}h</div>
+          <div class="shift-status">${statusToLabel(primaryStatus)}</div>
         `;
         cellContent.appendChild(primaryBox);
 
         (entry.associated || []).forEach(assoc => {
           const assocBox = document.createElement('div');
           assocBox.className = 'shift-box associated';
+          const assocStatus = assoc.status || entry?.status || 'unconfirmed';
+          assocBox.classList.add(statusToClass(assocStatus));
           assocBox.innerHTML = `
             <div>${assoc.guardName || 'Associated Guard'}</div>
             <div class="shift-hours">${(assoc.hours || 0).toFixed(2)}h</div>
+            <div class="shift-status">${statusToLabel(assocStatus)}</div>
           `;
           cellContent.appendChild(assocBox);
         });
@@ -433,7 +494,7 @@ function openRosterModal(row, dateStr) {
   const entry = row.rosterByDate?.[dateStr] || null;
 
   currentModalContext = { row, dateStr };
-  currentEntryStatus = entry?.status || 'unconfirmed';
+  currentPrimaryStatus = normalizeStatus(entry?.primary?.status || entry?.status || 'unconfirmed');
 
   document.getElementById('rosterModalTitle').textContent = rosterMode === 'monthly'
     ? 'Monthly Allocation'
@@ -441,7 +502,7 @@ function openRosterModal(row, dateStr) {
   document.getElementById('rosterDate').value = dateStr;
   document.getElementById('rosterModalMeta').value = `${row.clientName || '-'}  -  ${row.siteName || '-'}  -  ${row.guardName || '-'}`;
 
-  setEntryStatus(currentEntryStatus);
+  setPrimaryStatus(currentPrimaryStatus);
 
   const remaining = calculateRemainingPrimary(row, dateStr);
   document.getElementById('primaryRemainingInput').value =
@@ -450,6 +511,9 @@ function openRosterModal(row, dateStr) {
   const totalHours = entry?.totalHours || 0;
   document.getElementById('totalHoursInput').value = totalHours > 0 ? totalHours.toFixed(2) : '';
   document.getElementById('primaryHoursInput').value = (entry?.primary?.hours || 0).toFixed(2);
+  const primaryChargeRate = entry?.primary?.chargeRate || 0;
+  document.getElementById('primaryChargeRateInput').value = primaryChargeRate > 0 ? primaryChargeRate.toFixed(2) : '';
+  document.getElementById('primaryChargeAmount').value = '';
 
   const monthLabel = rosterState.startDate
     ? rosterState.startDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -473,14 +537,14 @@ function openRosterModal(row, dateStr) {
   if (rosterMode === 'day') {
     const assocItems = entry?.associated || [];
     if (assocItems.length > 0) {
-      assocItems.forEach(item => addAssociatedRow(item.guardId, item.hours));
+      assocItems.forEach(item => addAssociatedRow(item.guardId, item.hours, item.status, item.chargeRate));
     } else if (row.associatedGuardId) {
       addAssociatedRow(row.associatedGuardId, 0);
     }
   } else {
     const monthlyAssoc = row.monthlyAssociatedTargets || [];
     if (monthlyAssoc.length > 0) {
-      monthlyAssoc.forEach(item => addAssociatedRow(item.guardId, item.hours));
+      monthlyAssoc.forEach(item => addAssociatedRow(item.guardId, item.hours, 'unconfirmed', 0));
     } else if (row.associatedGuardId) {
       addAssociatedRow(row.associatedGuardId, 0);
     }
@@ -488,6 +552,7 @@ function openRosterModal(row, dateStr) {
 
   document.getElementById('deleteRosterBtn').style.display = entry ? 'inline-flex' : 'none';
   applyModeFields();
+  updateChargeAmounts();
 
   document.getElementById('rosterModal').classList.add('active');
 }
@@ -507,10 +572,11 @@ function calculateRemainingPrimary(row, dateStr) {
   return remaining;
 }
 
-function addAssociatedRow(defaultGuardId = null, defaultHours = 0) {
+function addAssociatedRow(defaultGuardId = null, defaultHours = 0, defaultStatus = 'unconfirmed', defaultChargeRate = 0) {
   const assocList = document.getElementById('assocList');
   const row = document.createElement('div');
   row.className = 'assoc-row';
+  row.dataset.status = normalizeStatus(defaultStatus);
 
   const guardSelect = document.createElement('select');
   if (rosterState.guards.length === 0) {
@@ -535,16 +601,66 @@ function addAssociatedRow(defaultGuardId = null, defaultHours = 0) {
   hoursInput.min = '0';
   hoursInput.step = '0.5';
   hoursInput.value = defaultHours > 0 ? defaultHours.toFixed(2) : '';
-  hoursInput.addEventListener('input', updateTotalFromAssociated);
+  hoursInput.className = 'assoc-hours';
+  hoursInput.addEventListener('input', () => {
+    updateTotalFromAssociated();
+    updateChargeAmounts();
+  });
+
+  const chargeRateInput = document.createElement('input');
+  chargeRateInput.type = 'number';
+  chargeRateInput.min = '0';
+  chargeRateInput.step = '0.01';
+  chargeRateInput.value = defaultChargeRate > 0 ? defaultChargeRate.toFixed(2) : '';
+  chargeRateInput.className = 'assoc-charge-rate';
+  chargeRateInput.placeholder = 'Charge Rate';
+  chargeRateInput.addEventListener('input', updateChargeAmounts);
+
+  const chargeAmount = document.createElement('input');
+  chargeAmount.type = 'text';
+  chargeAmount.readOnly = true;
+  chargeAmount.className = 'assoc-charge-amount';
+  chargeAmount.placeholder = 'Charge Amount';
+
+  const statusToggle = document.createElement('div');
+  statusToggle.className = 'assoc-status-toggle';
+
+  const statusButtons = [];
+  const setAssocStatus = (statusValue) => {
+    const normalized = normalizeStatus(statusValue);
+    row.dataset.status = normalized;
+    statusButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === normalized);
+    });
+  };
+
+  STATUS_OPTIONS.forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = option.label;
+    btn.dataset.status = option.value;
+    btn.className = `status-btn ${option.className}`;
+    btn.addEventListener('click', () => setAssocStatus(option.value));
+    statusButtons.push(btn);
+    statusToggle.appendChild(btn);
+  });
+
+  setAssocStatus(row.dataset.status);
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'assoc-remove';
   removeBtn.textContent = 'Remove';
-  removeBtn.addEventListener('click', () => row.remove());
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+    updateTotalFromAssociated();
+  });
 
   row.appendChild(guardSelect);
   row.appendChild(hoursInput);
+  row.appendChild(chargeRateInput);
+  row.appendChild(chargeAmount);
+  row.appendChild(statusToggle);
   row.appendChild(removeBtn);
   assocList.appendChild(row);
 }
@@ -566,20 +682,21 @@ function handleTotalHoursChange() {
     if (rows.length === 0) {
       addAssociatedRow(currentModalContext.row.associatedGuardId, remainder);
     } else {
-      const firstHours = rows[0].querySelector('input');
+      const firstHours = rows[0].querySelector('.assoc-hours');
       firstHours.value = remainder.toFixed(2);
     }
 
     rows.slice(1).forEach(r => {
-      const input = r.querySelector('input');
+      const input = r.querySelector('.assoc-hours');
       input.value = '';
     });
   } else {
     rows.forEach(r => {
-      const input = r.querySelector('input');
+      const input = r.querySelector('.assoc-hours');
       input.value = input.value ? input.value : '';
     });
   }
+  updateChargeAmounts();
 }
 
 function handlePrimaryHoursChange() {
@@ -600,7 +717,7 @@ function updateTotalFromAssociated() {
     const assocList = document.getElementById('assocList');
     const rows = Array.from(assocList.querySelectorAll('.assoc-row'));
     const assocTotal = rows.reduce((sum, row) => {
-      const val = parseFloat(row.querySelector('input').value) || 0;
+      const val = parseFloat(row.querySelector('.assoc-hours')?.value) || 0;
       return sum + val;
     }, 0);
     const total = primary + assocTotal;
@@ -612,12 +729,63 @@ function updateTotalFromAssociated() {
   const assocList = document.getElementById('assocList');
   const rows = Array.from(assocList.querySelectorAll('.assoc-row'));
   const assocTotal = rows.reduce((sum, row) => {
-    const val = parseFloat(row.querySelector('input').value) || 0;
+    const val = parseFloat(row.querySelector('.assoc-hours')?.value) || 0;
     return sum + val;
   }, 0);
 
   const totalHours = primaryHours + assocTotal;
   document.getElementById('totalHoursInput').value = totalHours > 0 ? totalHours.toFixed(2) : '';
+  updateChargeAmounts();
+}
+
+function updateChargeAmounts() {
+  if (rosterMode !== 'day') return;
+  const primaryHours = parseFloat(document.getElementById('primaryHoursInput').value) || 0;
+  const primaryChargeRate = parseFloat(document.getElementById('primaryChargeRateInput').value) || 0;
+  const primaryChargeAmount = primaryHours * primaryChargeRate;
+  const primaryChargeField = document.getElementById('primaryChargeAmount');
+  if (primaryChargeField) {
+    primaryChargeField.value = primaryChargeAmount > 0 ? formatCurrency(primaryChargeAmount) : '';
+  }
+
+  const assocList = document.getElementById('assocList');
+  const rows = Array.from(assocList.querySelectorAll('.assoc-row'));
+  let totalCharge = primaryChargeAmount;
+  let associatedHours = 0;
+  let associatedCharge = 0;
+
+  rows.forEach(row => {
+    const hours = parseFloat(row.querySelector('.assoc-hours')?.value) || 0;
+    const chargeRateInput = row.querySelector('.assoc-charge-rate');
+    const chargeRate = parseFloat(chargeRateInput?.value) || 0;
+    const amount = hours * chargeRate;
+    const amountField = row.querySelector('.assoc-charge-amount');
+    if (amountField) {
+      amountField.value = amount > 0 ? formatCurrency(amount) : '';
+    }
+    associatedHours += hours;
+    associatedCharge += amount;
+    totalCharge += amount;
+  });
+
+  const totalHours = primaryHours + associatedHours;
+
+  const primaryHoursTotal = document.getElementById('primaryHoursTotalValue');
+  if (primaryHoursTotal) primaryHoursTotal.textContent = primaryHours.toFixed(2);
+  const associatedHoursTotal = document.getElementById('associatedHoursTotalValue');
+  if (associatedHoursTotal) associatedHoursTotal.textContent = associatedHours.toFixed(2);
+  const totalHoursSummary = document.getElementById('totalHoursSummaryValue');
+  if (totalHoursSummary) totalHoursSummary.textContent = totalHours.toFixed(2);
+
+  const primaryChargeTotal = document.getElementById('primaryChargeTotalValue');
+  if (primaryChargeTotal) primaryChargeTotal.textContent = formatCurrency(primaryChargeAmount);
+  const associatedChargeTotal = document.getElementById('associatedChargeTotalValue');
+  if (associatedChargeTotal) associatedChargeTotal.textContent = formatCurrency(associatedCharge);
+
+  const totalChargeValue = document.getElementById('totalChargeValue');
+  if (totalChargeValue) {
+    totalChargeValue.textContent = formatCurrency(totalCharge);
+  }
 }
 
 function handleMonthlyTotalChange() {
@@ -631,9 +799,9 @@ function handleMonthlyTotalChange() {
   if (rows.length === 0 && assocTotal > 0) {
     addAssociatedRow(currentModalContext?.row?.associatedGuardId, assocTotal);
   } else if (rows.length > 0) {
-    rows[0].querySelector('input').value = assocTotal > 0 ? assocTotal.toFixed(2) : '';
+    rows[0].querySelector('.assoc-hours').value = assocTotal > 0 ? assocTotal.toFixed(2) : '';
     rows.slice(1).forEach(r => {
-      r.querySelector('input').value = '';
+      r.querySelector('.assoc-hours').value = '';
     });
   }
 }
@@ -644,7 +812,7 @@ function handleMonthlyPrimaryChange() {
   const assocList = document.getElementById('assocList');
   const rows = Array.from(assocList.querySelectorAll('.assoc-row'));
   const assocTotal = rows.reduce((sum, row) => {
-    const val = parseFloat(row.querySelector('input').value) || 0;
+    const val = parseFloat(row.querySelector('.assoc-hours')?.value) || 0;
     return sum + val;
   }, 0);
   const total = primary + assocTotal;
@@ -662,7 +830,9 @@ async function saveRosterEntry() {
   const associated = assocRows.map(row => ({
     guardId: row.querySelector('select').value,
     guardName: row.querySelector('select').selectedOptions[0]?.textContent || '',
-    hours: parseFloat(row.querySelector('input').value) || 0
+    hours: parseFloat(row.querySelector('.assoc-hours')?.value) || 0,
+    status: row.dataset.status || 'unconfirmed',
+    chargeRate: parseFloat(row.querySelector('.assoc-charge-rate')?.value) || 0
   })).filter(item => item.hours > 0);
 
   try {
@@ -691,6 +861,7 @@ async function saveRosterEntry() {
     } else {
       const date = document.getElementById('rosterDate').value;
       const primaryHours = parseFloat(document.getElementById('primaryHoursInput').value) || 0;
+      const primaryChargeRate = parseFloat(document.getElementById('primaryChargeRateInput').value) || 0;
 
       const response = await fetch('/api/roster/assign', {
         method: 'POST',
@@ -701,7 +872,9 @@ async function saveRosterEntry() {
           primaryHours,
           associated,
           notes,
-          status: currentEntryStatus
+          status: currentPrimaryStatus,
+          primaryStatus: currentPrimaryStatus,
+          primaryChargeRate
         })
       });
 
@@ -724,10 +897,12 @@ function closeRosterModal() {
   currentModalContext = null;
 }
 
-function setEntryStatus(status) {
-  currentEntryStatus = status === 'confirmed' ? 'confirmed' : 'unconfirmed';
-  document.getElementById('statusConfirmedBtn').classList.toggle('active', currentEntryStatus === 'confirmed');
-  document.getElementById('statusUnconfirmedBtn').classList.toggle('active', currentEntryStatus === 'unconfirmed');
+function setPrimaryStatus(status) {
+  currentPrimaryStatus = normalizeStatus(status);
+  const buttons = Array.from(document.querySelectorAll('#primaryStatusToggle .status-btn'));
+  buttons.forEach(button => {
+    button.classList.toggle('active', button.dataset.status === currentPrimaryStatus);
+  });
 }
 
 function applyModeFields() {
@@ -735,7 +910,9 @@ function applyModeFields() {
   const monthFields = document.querySelectorAll('.monthly-fields');
   dayFields.forEach(el => el.style.display = rosterMode === 'day' ? '' : 'none');
   monthFields.forEach(el => el.style.display = rosterMode === 'monthly' ? '' : 'none');
-  document.getElementById('statusToggle').style.display = rosterMode === 'day' ? 'flex' : 'none';
+  document.getElementById('primaryStatusToggle').style.display = rosterMode === 'day' ? 'flex' : 'none';
+  const rosterModal = document.getElementById('rosterModal');
+  if (rosterModal) rosterModal.dataset.mode = rosterMode;
   if (rosterMode === 'monthly') {
     document.getElementById('deleteRosterBtn').style.display = 'none';
   }
@@ -832,6 +1009,44 @@ async function saveRosterRow() {
   } catch (error) {
     console.error('Error creating roster row:', error);
     alert('Error creating roster row');
+  }
+}
+
+async function generateRosterPDF(row) {
+  if (!rosterState.startDate || !rosterState.endDate) return;
+
+  const start = toDateString(rosterState.startDate);
+  const end = toDateString(rosterState.endDate);
+
+  try {
+    const response = await fetch('/api/roster/row-payroll-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowId: row.rowId,
+        start,
+        end
+      })
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.message || 'Failed to generate PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeName = (row.guardName || 'guard').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    link.href = url;
+    link.download = `payroll-${safeName}-${start}-to-${end}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error generating roster PDF:', error);
+    alert(error.message || 'Error generating PDF');
   }
 }
 

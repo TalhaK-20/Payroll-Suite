@@ -1,4 +1,4 @@
-const PDFDocument = require('pdfkit');
+﻿const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
@@ -7,12 +7,24 @@ class PayrollPDFGenerator {
     this.pageWidth = 595; // A4 width in points
     this.pageHeight = 842; // A4 height in points
     this.margin = 40;
-    this.primaryColor = '#1a365d';
-    this.secondaryColor = '#2d5a8c';
-    this.accentColor = '#27ae60';
-    this.dangerColor = '#dc3545';
-    this.lightGray = '#f8f9fa';
-    this.borderColor = '#dee2e6';
+    this.primaryColor = '#0f172a';
+    this.secondaryColor = '#1f2937';
+    this.accentColor = '#0f766e';
+    this.dangerColor = '#dc2626';
+    this.lightGray = '#f8fafc';
+    this.borderColor = '#e5e7eb';
+    this.mutedText = '#64748b';
+  }
+
+  formatCurrency(value) {
+    const amount = Number(value) || 0;
+    return `GBP ${amount.toFixed(2)}`;
+  }
+
+  ensureSpace(doc, height) {
+    if (doc.y + height > this.pageHeight - this.margin) {
+      doc.addPage();
+    }
   }
 
   /**
@@ -85,96 +97,102 @@ class PayrollPDFGenerator {
    * Add professional header with company branding
    */
   addHeader(doc, payNumber = 1) {
-    // Background
-    doc.rect(this.margin - 40, this.margin - 40, this.pageWidth - 2 * (this.margin - 40), 80)
-      .fill(this.primaryColor);
+    const titleY = this.margin - 10;
 
-    // Title
-    doc.fontSize(28)
-      .fillColor('#ffffff')
+    doc.fontSize(20)
+      .fillColor(this.primaryColor)
       .font('Helvetica-Bold')
-      .text('PAYROLL STATEMENT', this.margin, 50, { align: 'left' })
-      .fontSize(11)
-      .font('Helvetica')
-      .text('Security Guard Employment Record', this.margin, 80);
+      .text('Payroll Statement', this.margin, titleY);
 
-    // Date info on right
     doc.fontSize(9)
-      .text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 
-        this.pageWidth - this.margin - 150, 50, { width: 150, align: 'right' });
+      .fillColor(this.mutedText)
+      .font('Helvetica')
+      .text('Security Guard Employment Record', this.margin, titleY + 24);
 
-    doc.fillColor('#000000');
-    doc.y = 130;
+    const rightX = this.pageWidth - this.margin - 180;
+    doc.fontSize(9)
+      .fillColor(this.mutedText)
+      .text(`Generated: ${new Date().toLocaleDateString('en-GB')}`,
+        rightX, titleY + 4, { width: 180, align: 'right' })
+      .text(`Pay Run: ${String(payNumber).padStart(2, '0')}`,
+        rightX, titleY + 18, { width: 180, align: 'right' });
+
+    doc.moveTo(this.margin, titleY + 36)
+      .lineTo(this.pageWidth - this.margin, titleY + 36)
+      .stroke(this.borderColor);
+
+    doc.y = titleY + 48;
+  }
+
+  /**
+   * Add section title
+   */
+  addSectionTitle(doc, title) {
+    this.ensureSpace(doc, 28);
+    doc.fontSize(11)
+      .font('Helvetica-Bold')
+      .fillColor(this.secondaryColor)
+      .text(title, this.margin, doc.y);
+
+    doc.moveTo(this.margin, doc.y + 14)
+      .lineTo(this.pageWidth - this.margin, doc.y + 14)
+      .stroke(this.borderColor);
+
+    doc.y = doc.y + 22;
+  }
+
+  drawLabelValue(doc, x, y, labelWidth, valueWidth, label, value) {
+    doc.fontSize(9).font('Helvetica').fillColor(this.mutedText);
+    doc.text(label, x, y, { width: labelWidth });
+
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(this.primaryColor);
+    doc.text(value, x + labelWidth, y, { width: valueWidth });
   }
 
   /**
    * Add guard basic information section
    */
   addGuardInformation(doc, data) {
-    this.addSectionTitle(doc, '👤 GUARD INFORMATION');
+    this.addSectionTitle(doc, 'GUARD INFORMATION');
+    this.ensureSpace(doc, 80);
 
-    const infoBoxX = this.margin;
-    const infoBoxWidth = this.pageWidth - 2 * this.margin;
-    const infoBoxHeight = 100;
+    const leftItems = [
+      { label: 'Guard Name', value: data.guardName || 'N/A' },
+      { label: 'Insurance Number', value: data.insuranceNumber || 'N/A' },
+      { label: 'Pay Rate (GBP/hour)', value: this.formatCurrency(data.payRate || 0) }
+    ];
 
-    // Background
-    doc.rect(infoBoxX, doc.y, infoBoxWidth, infoBoxHeight)
-      .fill(this.lightGray);
+    const rightItems = [
+      { label: 'Client Name', value: data.clientName || 'N/A' },
+      { label: 'Charge Rate (GBP/hour)', value: this.formatCurrency(data.chargeRate || 0) },
+      { label: 'Status', value: data.status || 'Pending' }
+    ];
 
-    const infoY = doc.y + 10;
-    doc.fontSize(10);
+    const rowHeight = 18;
+    const labelWidth = 120;
+    const colGap = 20;
+    const colWidth = (this.pageWidth - 2 * this.margin - colGap) / 2;
+    const leftX = this.margin;
+    const rightX = this.margin + colWidth + colGap;
+    const startY = doc.y;
 
-    // Left column
-    doc.fillColor('#666666');
-    doc.text('Guard Name:', infoBoxX + 10, infoY, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text(data.guardName || 'N/A', infoBoxX + 110, infoY - 10);
+    for (let i = 0; i < leftItems.length; i++) {
+      const y = startY + i * rowHeight;
+      const left = leftItems[i];
+      const right = rightItems[i];
+      this.drawLabelValue(doc, leftX, y, labelWidth, colWidth - labelWidth, left.label, left.value);
+      this.drawLabelValue(doc, rightX, y, labelWidth, colWidth - labelWidth, right.label, right.value);
+    }
 
-    doc.fontSize(10).font('Helvetica');
-    doc.fillColor('#666666');
-    doc.text('Insurance Number:', infoBoxX + 10, infoY + 20, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text(data.insuranceNumber || 'N/A', infoBoxX + 110, infoY + 10);
-
-    doc.fontSize(10).font('Helvetica');
-    doc.fillColor('#666666');
-    doc.text('Pay Rate (£/hour):', infoBoxX + 10, infoY + 40, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text('£' + (parseFloat(data.payRate) || 0).toFixed(2), infoBoxX + 110, infoY + 30);
-
-    // Right column
-    doc.fontSize(10).font('Helvetica');
-    doc.fillColor('#666666');
-    doc.text('Client Name:', infoBoxX + infoBoxWidth / 2 + 10, infoY, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text(data.clientName || 'N/A', infoBoxX + infoBoxWidth / 2 + 110, infoY - 10);
-
-    doc.fontSize(10).font('Helvetica');
-    doc.fillColor('#666666');
-    doc.text('Charge Rate (£/hour):', infoBoxX + infoBoxWidth / 2 + 10, infoY + 20, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text('£' + (parseFloat(data.chargeRate) || 0).toFixed(2), infoBoxX + infoBoxWidth / 2 + 110, infoY + 10);
-
-    doc.fontSize(10).font('Helvetica');
-    doc.fillColor('#666666');
-    doc.text('Status:', infoBoxX + infoBoxWidth / 2 + 10, infoY + 40, { continued: false });
-    doc.fillColor('#000000');
-    doc.fontSize(11).font('Helvetica-Bold');
-    doc.text(data.status || 'Pending', infoBoxX + infoBoxWidth / 2 + 110, infoY + 30);
-
-    doc.y = infoY + 100;
+    doc.y = startY + leftItems.length * rowHeight + 6;
   }
 
   /**
    * Add working hours and rates section with associated guard data
    */
   addWorkingHoursSection(doc, data) {
-    this.addSectionTitle(doc, '⏰ WORKING HOURS & RATES');
+    this.addSectionTitle(doc, 'WORKING HOURS AND RATES');
+    this.ensureSpace(doc, 160);
 
     const tableX = this.margin;
     const tableWidth = this.pageWidth - 2 * this.margin;
@@ -186,6 +204,9 @@ class PayrollPDFGenerator {
     const payRate = parseFloat(data.payRate) || 0;
     const chargeRate = parseFloat(data.chargeRate) || 0;
     const totalHoursDecimal = totalHours + totalMinutes / 60;
+    const totalPayValue = typeof data.totalPayOverride === 'number'
+      ? data.totalPayOverride
+      : totalHoursDecimal * payRate;
 
     // Get hours distribution if available
     const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || totalHoursDecimal;
@@ -195,33 +216,33 @@ class PayrollPDFGenerator {
     // Draw table
     this.drawTableRow(doc, tableX, doc.y, [
       { text: 'Total Hours', width: colWidth / 2 },
-      { text: totalHours.toString(), width: colWidth / 2 },
+      { text: totalHours.toString(), width: colWidth / 2, align: 'right' },
       { text: 'Total Minutes', width: colWidth / 2 },
-      { text: totalMinutes.toString(), width: colWidth / 2 }
+      { text: totalMinutes.toString(), width: colWidth / 2, align: 'right' }
     ]);
 
     this.drawTableRow(doc, tableX, doc.y, [
-      { text: 'Hours in Decimal', width: colWidth / 2 },
-      { text: totalHoursDecimal.toFixed(2), width: colWidth / 2 },
-      { text: 'Pay Rate (£/hour)', width: colWidth / 2 },
-      { text: '£' + payRate.toFixed(2), width: colWidth / 2 }
+      { text: 'Hours (Decimal)', width: colWidth / 2 },
+      { text: totalHoursDecimal.toFixed(2), width: colWidth / 2, align: 'right' },
+      { text: 'Pay Rate (GBP/hour)', width: colWidth / 2 },
+      { text: this.formatCurrency(payRate), width: colWidth / 2, align: 'right' }
     ]);
 
     this.drawTableRow(doc, tableX, doc.y, [
-      { text: 'Charge Rate (£/hour)', width: colWidth / 2 },
-      { text: '£' + chargeRate.toFixed(2), width: colWidth / 2 },
+      { text: 'Charge Rate (GBP/hour)', width: colWidth / 2 },
+      { text: this.formatCurrency(chargeRate), width: colWidth / 2, align: 'right' },
       { text: 'Total Pay', width: colWidth / 2 },
-      { text: '£' + (totalHoursDecimal * payRate).toFixed(2), width: colWidth / 2, isBold: true }
+      { text: this.formatCurrency(totalPayValue), width: colWidth / 2, align: 'right', isBold: true }
     ]);
 
     // Add hours distribution section if applicable
     if (primaryGuardHours > 0 || associatedGuardHours > 0) {
-      doc.y += 10;
+      doc.y += 8;
       this.drawTableRow(doc, tableX, doc.y, [
         { text: 'Primary Guard Hours', width: colWidth / 2 },
-        { text: primaryGuardHours.toFixed(2), width: colWidth / 2 },
+        { text: primaryGuardHours.toFixed(2), width: colWidth / 2, align: 'right' },
         { text: 'Associated Guard Hours', width: colWidth / 2 },
-        { text: associatedGuardHours.toFixed(2), width: colWidth / 2 }
+        { text: associatedGuardHours.toFixed(2), width: colWidth / 2, align: 'right' }
       ]);
 
       // Associated guard info if present
@@ -229,13 +250,41 @@ class PayrollPDFGenerator {
         this.drawTableRow(doc, tableX, doc.y, [
           { text: 'Associated Guard', width: colWidth / 2 },
           { text: associatedGuardName, width: colWidth / 2 },
-          { text: 'Guard Pay', width: colWidth / 2 },
-          { text: '£' + (associatedGuardHours * payRate).toFixed(2), width: colWidth / 2 }
+          { text: 'Associated Pay', width: colWidth / 2 },
+          { text: this.formatCurrency(associatedGuardHours * payRate), width: colWidth / 2, align: 'right' }
         ]);
+      }
+
+      if (typeof data.primaryPayAmount === 'number' || typeof data.associatedPayAmount === 'number') {
+        const primaryPay = typeof data.primaryPayAmount === 'number' ? data.primaryPayAmount : 0;
+        const associatedPay = typeof data.associatedPayAmount === 'number' ? data.associatedPayAmount : 0;
+        this.drawTableRow(doc, tableX, doc.y, [
+          { text: 'Primary Pay', width: colWidth / 2 },
+          { text: this.formatCurrency(primaryPay), width: colWidth / 2, align: 'right' },
+          { text: 'Associated Pay', width: colWidth / 2 },
+          { text: this.formatCurrency(associatedPay), width: colWidth / 2, align: 'right' }
+        ]);
+      }
+
+      if (Array.isArray(data.associatedPayDetails) && data.associatedPayDetails.length > 0) {
+        doc.y += 6;
+        doc.fontSize(9).font('Helvetica').fillColor(this.mutedText);
+        doc.text('Associated Guard Breakdown:', tableX, doc.y);
+        doc.y += 4;
+        data.associatedPayDetails.forEach(item => {
+          this.ensureSpace(doc, 14);
+          doc.fontSize(9).font('Helvetica').fillColor('#374151');
+          doc.text(
+            `${item.guardName || 'Associated'} - ${Number(item.hours || 0).toFixed(2)}h, ${this.formatCurrency(item.payAmount || 0)}`,
+            tableX + 10,
+            doc.y + 6
+          );
+          doc.y += 12;
+        });
       }
     }
 
-    doc.y += 20;
+    doc.y += 16;
   }
 
   /**
@@ -250,71 +299,41 @@ class PayrollPDFGenerator {
       return;
     }
 
-    this.addSectionTitle(doc, '🏦 BANK ACCOUNT(S)');
+    this.addSectionTitle(doc, 'BANK ACCOUNT(S)');
+
+    const drawBankBox = (account) => {
+      const boxX = this.margin;
+      const boxWidth = this.pageWidth - 2 * this.margin;
+      const boxHeight = 72;
+
+      this.ensureSpace(doc, boxHeight + 10);
+      doc.roundedRect(boxX, doc.y, boxWidth, boxHeight, 6)
+        .fillAndStroke(this.lightGray, this.borderColor);
+
+      const startY = doc.y + 10;
+      const labelWidth = 120;
+      const valueWidth = boxWidth - labelWidth - 20;
+      const x = boxX + 10;
+
+      this.drawLabelValue(doc, x, startY, labelWidth, valueWidth, 'Account Holder', account.accountHolderName || 'N/A');
+      this.drawLabelValue(doc, x, startY + 16, labelWidth, valueWidth, 'Bank Name', account.bankName || 'N/A');
+      this.drawLabelValue(doc, x, startY + 32, labelWidth, valueWidth, 'Sort Code', account.sortCode || 'N/A');
+      this.drawLabelValue(doc, x, startY + 48, labelWidth, valueWidth, 'Account Number', account.accountNumber || account.accountNo || 'N/A');
+
+      doc.y += boxHeight + 12;
+    };
 
     // Handle old format (single account)
     if (hasOldFormat) {
-      const boxX = this.margin;
-      const boxWidth = this.pageWidth - 2 * this.margin;
-      doc.rect(boxX, doc.y, boxWidth, 70).fill(this.lightGray);
-
-      const boxY = doc.y + 10;
-      doc.fontSize(9).font('Helvetica').fillColor('#666666');
-
-      doc.text('Account Holder:', boxX + 10, boxY);
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-      doc.text(data.accountHolderName || 'N/A', boxX + 150, boxY - 9);
-
-      doc.fontSize(9).font('Helvetica').fillColor('#666666');
-      doc.text('Bank Name:', boxX + 10, boxY + 15);
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-      doc.text(data.bankName || 'N/A', boxX + 150, boxY + 6);
-
-      doc.fontSize(9).font('Helvetica').fillColor('#666666');
-      doc.text('Sort Code:', boxX + 10, boxY + 30);
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-      doc.text(data.sortCode || 'N/A', boxX + 150, boxY + 21);
-
-      doc.fontSize(9).font('Helvetica').fillColor('#666666');
-      doc.text('Account #:', boxX + 10, boxY + 45);
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-      doc.text(data.accountNo || 'N/A', boxX + 150, boxY + 36);
-
-      doc.y += 85;
+      drawBankBox({
+        accountHolderName: data.accountHolderName,
+        bankName: data.bankName,
+        sortCode: data.sortCode,
+        accountNumber: data.accountNo
+      });
     } else {
       // Handle new format (multiple accounts)
-      bankAccounts.forEach((account, index) => {
-        const isActive = account.active !== false;
-        const isPrimary = account.isPrimary === true;
-        
-        const boxX = this.margin;
-        const boxWidth = this.pageWidth - 2 * this.margin;
-        doc.rect(boxX, doc.y, boxWidth, 70).fill(this.lightGray);
-
-        const boxY = doc.y + 10;
-        doc.fontSize(9).font('Helvetica').fillColor('#666666');
-
-        doc.text('Account Holder:', boxX + 10, boxY);
-        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-        doc.text(account.accountHolderName || 'N/A', boxX + 150, boxY - 9);
-
-        doc.fontSize(9).font('Helvetica').fillColor('#666666');
-        doc.text('Bank Name:', boxX + 10, boxY + 15);
-        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-        doc.text(account.bankName || 'N/A', boxX + 150, boxY + 6);
-
-        doc.fontSize(9).font('Helvetica').fillColor('#666666');
-        doc.text('Sort Code:', boxX + 10, boxY + 30);
-        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-        doc.text(account.sortCode || 'N/A', boxX + 150, boxY + 21);
-
-        doc.fontSize(9).font('Helvetica').fillColor('#666666');
-        doc.text('Account #:', boxX + 10, boxY + 45);
-        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-        doc.text(account.accountNumber || 'N/A', boxX + 150, boxY + 36);
-
-        doc.y += 85;
-      });
+      bankAccounts.forEach(account => drawBankBox(account));
     }
   }
 
@@ -322,12 +341,13 @@ class PayrollPDFGenerator {
    * Add payment summary section
    */
   addPaymentSummary(doc, data, payNumber = 1) {
-    this.addSectionTitle(doc, '💰 PAYMENT SUMMARY');
+    this.addSectionTitle(doc, 'PAYMENT SUMMARY');
 
     const totalHoursDecimal = (data.totalHours || 0) + ((data.totalMinutes || 0) / 60);
     const payRate = parseFloat(data.payRate) || 0;
     const chargeRate = parseFloat(data.chargeRate) || 0;
-    const totalPay = totalHoursDecimal * payRate;
+    const hasTotalOverride = typeof data.totalPayOverride === 'number';
+    const totalPay = hasTotalOverride ? data.totalPayOverride : (totalHoursDecimal * payRate);
     const totalCharge = totalHoursDecimal * chargeRate;
 
     // Get the appropriate payment amount based on payNumber
@@ -340,63 +360,57 @@ class PayrollPDFGenerator {
     // Get hours distribution if available
     const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || totalHoursDecimal;
     const associatedGuardHours = (data.hoursDistribution?.associatedGuardHours) || 0;
-    const associatedGuardName = (data.hoursDistribution?.associatedGuardId?.guardName) || '';
+
+    const leftItems = [
+      { label: 'Hours Worked', value: `${totalHoursDecimal.toFixed(2)} hours` },
+      { label: 'Pay Rate', value: `${this.formatCurrency(payRate)}/hour` },
+      { label: 'Charge Rate', value: `${this.formatCurrency(chargeRate)}/hour` },
+      { label: 'Primary Guard Hours', value: `${primaryGuardHours.toFixed(2)} hours` }
+    ];
+
+    if (associatedGuardHours > 0) {
+      leftItems.push({ label: 'Associated Guard Hours', value: `${associatedGuardHours.toFixed(2)} hours` });
+    }
+
+    const rightItems = [
+      { label: 'Total Pay', value: this.formatCurrency(totalPay) },
+      { label: 'Payment Amount', value: this.formatCurrency(paymentAmount) },
+      { label: 'Total Charge', value: this.formatCurrency(totalCharge) }
+    ];
 
     const summaryBoxX = this.margin;
     const summaryBoxWidth = this.pageWidth - 2 * this.margin;
+    const rowHeight = 18;
+    const rows = Math.max(leftItems.length, rightItems.length);
+    const boxHeight = rows * rowHeight + 16;
+
+    this.ensureSpace(doc, boxHeight + 10);
 
     // Summary box
-    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 120)
-      .stroke(this.borderColor);
+    doc.roundedRect(summaryBoxX, doc.y, summaryBoxWidth, boxHeight, 6)
+      .fillAndStroke(this.lightGray, this.borderColor);
 
-    const summaryY = doc.y + 15;
+    const colGap = 20;
+    const colWidth = (summaryBoxWidth - colGap) / 2;
+    const labelWidth = 120;
+    const leftX = summaryBoxX + 12;
+    const rightX = summaryBoxX + colWidth + colGap;
+    const startY = doc.y + 10;
 
-    // Left column
-    doc.fontSize(10).font('Helvetica').fillColor('#666666');
-    doc.text('Hours Worked:', summaryBoxX + 20, summaryY);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text(totalHoursDecimal.toFixed(2) + ' hours', summaryBoxX + 150, summaryY - 10);
+    for (let i = 0; i < rows; i++) {
+      const y = startY + i * rowHeight;
+      const left = leftItems[i];
+      const right = rightItems[i];
 
-    doc.fontSize(10).font('Helvetica').fillColor('#666666');
-    doc.text('Pay Rate:', summaryBoxX + 20, summaryY + 20);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text('£' + payRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 10);
-
-    doc.fontSize(10).font('Helvetica').fillColor('#666666');
-    doc.text('Primary Guard Hours:', summaryBoxX + 20, summaryY + 40);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text(primaryGuardHours.toFixed(2) + ' hours', summaryBoxX + 150, summaryY + 30);
-
-    doc.fontSize(10).font('Helvetica').fillColor('#666666');
-    doc.text('Charge Rate:', summaryBoxX + 20, summaryY + 60);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text('£' + chargeRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 50);
-
-    // Right column
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(this.accentColor);
-    doc.text('TOTAL PAY (Amount):', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY);
-    doc.fontSize(14).fillColor(this.accentColor);
-    doc.text('£' + paymentAmount.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY - 10);
-
-    doc.fontSize(9).font('Helvetica').fillColor('#666666');
-    doc.text('Calculated (Hours × Rate):', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 20);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text('£' + totalPay.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 10);
-
-    doc.fontSize(9).font('Helvetica').fillColor('#666666');
-    doc.text('Total Charge:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 40);
-    doc.fillColor('#000000').font('Helvetica-Bold');
-    doc.text('£' + totalCharge.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 30);
-
-    // Associated guard info if present
-    if (associatedGuardHours > 0 && associatedGuardName) {
-      doc.fontSize(10).font('Helvetica').fillColor('#666666');
-      doc.text(associatedGuardName + ' Hours:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 60);
-      doc.fillColor('#000000').font('Helvetica-Bold');
-      doc.text(associatedGuardHours.toFixed(2) + ' hours', summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 50);
+      if (left) {
+        this.drawLabelValue(doc, leftX, y, labelWidth, colWidth - labelWidth - 12, left.label, left.value);
+      }
+      if (right) {
+        this.drawLabelValue(doc, rightX, y, labelWidth, colWidth - labelWidth - 12, right.label, right.value);
+      }
     }
 
-    doc.y += 140;
+    doc.y += boxHeight + 14;
   }
 
   /**
@@ -411,43 +425,23 @@ class PayrollPDFGenerator {
       .stroke(this.borderColor);
 
     // Footer text
-    doc.fontSize(9)
-      .fillColor('#999999')
-      .text('This is a confidential payroll statement. For official use only.', 
-        this.margin, footerY + 10, 
+    doc.fontSize(8)
+      .fillColor(this.mutedText)
+      .text('This is a confidential payroll statement for internal use only.',
+        this.margin, footerY + 10,
         { align: 'center', width: this.pageWidth - 2 * this.margin });
 
     doc.fontSize(8)
-      .text('Generated on ' + new Date().toLocaleString('en-GB'), 
-        this.margin, footerY + 25, 
+      .text('Generated on ' + new Date().toLocaleString('en-GB'),
+        this.margin, footerY + 24,
         { align: 'center', width: this.pageWidth - 2 * this.margin });
-  }
-
-  /**
-   * Add section title
-   */
-  addSectionTitle(doc, title) {
-    const sectionY = doc.y + 10;
-
-    // Background line
-    doc.rect(this.margin, sectionY, this.pageWidth - 2 * this.margin, 30)
-      .fill(this.primaryColor);
-
-    // Title
-    doc.fontSize(13)
-      .font('Helvetica-Bold')
-      .fillColor('#ffffff')
-      .text(title, this.margin + 15, sectionY + 6, { width: this.pageWidth - 2 * this.margin - 30 });
-
-    doc.y = sectionY + 35;
   }
 
   /**
    * Draw a table row
    */
   drawTableRow(doc, startX, startY, cells) {
-    const rowHeight = 30;
-    const borderColor = this.borderColor;
+    const rowHeight = 26;
 
     // Draw cells
     let currentX = startX;
@@ -456,19 +450,19 @@ class PayrollPDFGenerator {
 
       // Cell background
       doc.rect(currentX, startY, cellWidth, rowHeight)
-        .fillAndStroke(this.lightGray, borderColor);
+        .fillAndStroke(this.lightGray, this.borderColor);
 
       // Cell text
-      doc.fontSize(10);
+      doc.fontSize(9);
       if (cell.isBold) {
         doc.font('Helvetica-Bold').fillColor(this.primaryColor);
       } else {
-        doc.font('Helvetica').fillColor('#333333');
+        doc.font('Helvetica').fillColor('#111827');
       }
 
-      doc.text(cell.text, currentX + 8, startY + 8, {
+      doc.text(cell.text, currentX + 8, startY + 7, {
         width: cellWidth - 16,
-        align: 'left'
+        align: cell.align || 'left'
       });
 
       currentX += cellWidth;
