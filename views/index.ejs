@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll Management System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>💼 Payroll Management System</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Dashboard</a></li>
+          <li><a href="/upload">Upload Excel</a></li>
+          <li><a href="#" onclick="openAddForm(); return false;">Add Record</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- Alerts -->
+      <div id="alertContainer"></div>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <h2>Payroll Dashboard</h2>
+        <p>Manage and track all payroll records efficiently</p>
+      </div>
+
+      <!-- Export Section -->
+      <div class="export-section">
+        <div class="export-title">📊 Export Data</div>
+        <div class="export-buttons">
+          <button id="exportPDF" class="btn btn-secondary">
+            📄 Export to PDF
+          </button>
+          <button id="exportExcel" class="btn btn-success">
+            📑 Export to Excel
+          </button>
+          <button onclick="openAddForm()" class="btn btn-primary">
+            ➕ Add New Record
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Section -->
+      <div class="filter-section">
+        <div class="filter-title">🔍 Advanced Filters</div>
+        <div class="filter-grid">
+          <div class="filter-input">
+            <label>Client Name</label>
+            <input type="text" id="filterClient" placeholder="Search by client name">
+          </div>
+          <div class="filter-input">
+            <label>Guard Name</label>
+            <input type="text" id="filterGuard" placeholder="Search by guard name">
+          </div>
+          <div class="filter-input">
+            <label>Min Hours</label>
+            <input type="number" id="filterMinHours" placeholder="Minimum hours" min="0">
+          </div>
+          <div class="filter-input">
+            <label>Max Hours</label>
+            <input type="number" id="filterMaxHours" placeholder="Maximum hours" min="0">
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
+          <button id="resetFilters" class="btn btn-secondary">Reset</button>
+        </div>
+      </div>
+
+      <!-- Payroll Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Client Name</th>
+              <th>Guard Name</th>
+              <th>Total Hours</th>
+              <th>Pay Rate</th>
+              <th>Charge Rate</th>
+              <th>Pay 1</th>
+              <th>Pay 2</th>
+              <th>Pay 3</th>
+              <th>Account No</th>
+              <th>Sort Code</th>
+              <th>📄 Generate Payroll</th>
+              <th>⚙️ Manage</th>
+            </tr>
+          </thead>
+          <tbody id="payrollTableBody">
+            <tr>
+              <td colspan="11" class="text-center">
+                <div class="spinner">
+                  <div class="loading"></div>
+                  <span>Loading records...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Form Modal -->
+  <div id="formModal" class="modal">
+    <div class="modal-content modal-professional">
+      <div class="modal-header-professional">
+        <div class="modal-title-section">
+          <div class="modal-icon">📋</div>
+          <div>
+            <h2 id="formModalTitle">Add New Payroll Record</h2>
+            <p class="modal-subtitle">Enter employee and payment information</p>
+          </div>
+        </div>
+        <button class="modal-close-btn">✕</button>
+      </div>
+      
+      <form id="payrollForm">
+        <input type="hidden" id="id" name="id">
+        
+        <!-- Employee Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">👤 Employee Information</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Client Name <span class="required">*</span></label>
+              <input type="text" id="clientName" name="clientName" placeholder="e.g., ABC Security Ltd" required>
+              <small class="field-hint">Company or client name</small>
+            </div>
+            <div class="form-group">
+              <label>Guard Name <span class="required">*</span></label>
+              <input type="text" id="guardName" name="guardName" placeholder="e.g., John Smith" required>
+              <small class="field-hint">Employee's full name</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Working Hours Section -->
+        <div class="form-section">
+          <h3 class="section-title">⏰ Working Hours & Rates</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Total Hours <span class="required">*</span></label>
+              <input type="number" id="totalHours" name="totalHours" step="0.5" min="0" placeholder="e.g., 40" required>
+              <small class="field-hint">Hours worked this period</small>
+            </div>
+            <div class="form-group">
+              <label>Pay Rate <span class="currency">£/hour</span> <span class="required">*</span></label>
+              <input type="number" id="payRate" name="payRate" step="0.01" min="0" placeholder="e.g., 12.50" required>
+              <small class="field-hint">Hourly pay rate</small>
+            </div>
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Charge Rate <span class="currency">£/hour</span> <span class="required">*</span></label>
+              <input type="number" id="chargeRate" name="chargeRate" step="0.01" min="0" placeholder="e.g., 18.75" required>
+              <small class="field-hint">Billing rate to client</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Amounts Section -->
+        <div class="form-section">
+          <h3 class="section-title">💷 Payment Amounts</h3>
+          <div class="form-row-3col">
+            <div class="form-group">
+              <label>Pay 1 <span class="currency">£</span> <span class="required">*</span></label>
+              <input type="number" id="pay1" name="pay1" step="0.01" min="0" placeholder="e.g., 500" required>
+              <small class="field-hint">Payroll 01</small>
+            </div>
+            <div class="form-group">
+              <label>Pay 2 <span class="currency">£</span> <span class="required">*</span></label>
+              <input type="number" id="pay2" name="pay2" step="0.01" min="0" placeholder="e.g., 550" required>
+              <small class="field-hint">Payroll 02</small>
+            </div>
+            <div class="form-group">
+              <label>Pay 3 <span class="currency">£</span> <span class="required">*</span></label>
+              <input type="number" id="pay3" name="pay3" step="0.01" min="0" placeholder="e.g., 600" required>
+              <small class="field-hint">Payroll 03</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Details Section -->
+        <div class="form-section">
+          <h3 class="section-title">🏦 Bank Account Details</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Account Holder Name <span class="required">*</span></label>
+              <input type="text" id="accountHolderName" name="accountHolderName" placeholder="e.g., John Smith" required>
+              <small class="field-hint">Name on bank account</small>
+            </div>
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Account Number <span class="required">*</span></label>
+              <input type="text" id="accountNo" name="accountNo" placeholder="e.g., 12345678" required>
+              <small class="field-hint">8-digit account number</small>
+            </div>
+            <div class="form-group">
+              <label>Sort Code <span class="required">*</span></label>
+              <input type="text" id="sortCode" name="sortCode" placeholder="e.g., 20-20-20" required>
+              <small class="field-hint">Format: XX-XX-XX</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-professional">
+          <button type="button" class="btn btn-secondary btn-large" onclick="document.getElementById('formModal').classList.remove('active')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-large">💾 Save Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

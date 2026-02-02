@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - Page Not Found</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .error-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a365d, #2d5a8c);
+      padding: 2rem;
+    }
+    
+    .error-content {
+      text-align: center;
+      background: white;
+      padding: 3rem;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      max-width: 600px;
+    }
+    
+    .error-code {
+      font-size: 6rem;
+      font-weight: 700;
+      color: var(--danger);
+      margin: 0;
+      line-height: 1;
+    }
+    
+    .error-title {
+      font-size: 2rem;
+      color: var(--primary);
+      margin: 1rem 0;
+      font-weight: 600;
+    }
+    
+    .error-message {
+      color: var(--secondary);
+      font-size: 1.1rem;
+      margin: 1.5rem 0;
+      line-height: 1.6;
+    }
+    
+    .error-icon {
+      font-size: 5rem;
+      margin: 1rem 0;
+    }
+    
+    .error-actions {
+      margin-top: 2rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .error-actions a,
+    .error-actions button {
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .error-btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .error-btn-primary:hover {
+      background: var(--secondary);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+    
+    .error-btn-secondary {
+      background: var(--light);
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    
+    .error-btn-secondary:hover {
+      background: var(--primary);
+      color: white;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <div class="error-content">
+      <div class="error-icon">🔍</div>
+      <h1 class="error-code">404</h1>
+      <h2 class="error-title">Page Not Found</h2>
+      <p class="error-message">Sorry, the page you're looking for doesn't exist. Please check the URL and try again.</p>
+      <div class="error-actions">
+        <a href="/" class="error-btn-primary">🏠 Go to Dashboard</a>
+        <a href="javascript:history.back()" class="error-btn-secondary">← Go Back</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

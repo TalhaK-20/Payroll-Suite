@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Excel - Payroll System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>💼 Payroll Management System</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Dashboard</a></li>
+          <li><a href="/upload">Upload Excel</a></li>
+          <li><a href="#" onclick="openAddForm(); return false;">Add Record</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- Alerts -->
+      <div id="alertContainer"></div>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <h2>📥 Upload Excel Data</h2>
+        <p>Import payroll records from an Excel file and generate payroll documents</p>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="upload-section">
+        <h3 style="margin-bottom: 1.5rem; color: var(--primary);">Step 1: Upload Excel File</h3>
+        
+        <div id="dropZone" class="drop-zone">
+          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">📁 Drag and drop your Excel file here</p>
+          <p style="color: #666;">or click to browse</p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+
+        <p style="text-align: center; margin-top: 1rem; color: #666; font-size: 0.9rem;">
+          ✅ Supported formats: .xlsx, .xls
+        </p>
+      </div>
+
+      <!-- Uploaded Data Table -->
+      <div id="uploadedDataContainer" class="hidden">
+        <div class="page-header" style="margin-top: 2rem;">
+          <h3>Step 2: Generate Payroll Documents</h3>
+          <p>Select the payroll version for each employee</p>
+        </div>
+
+        <div class="table-container" style="margin-top: 2rem;">
+          <!-- Table will be inserted here -->
+        </div>
+      </div>
+
+      <!-- Instructions -->
+      <div class="filter-section" style="margin-top: 2rem;">
+        <h3 style="margin-bottom: 1rem; color: var(--primary);">📋 File Format Instructions</h3>
+        <p style="margin-bottom: 1rem;">Your Excel file should have the following columns:</p>
+        <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+          <li>Client Name</li>
+          <li>Guard Name</li>
+          <li>Total Hours</li>
+          <li>Pay Rate</li>
+          <li>Charge Rate</li>
+          <li>Pay 1</li>
+          <li>Pay 2</li>
+          <li>Pay 3</li>
+          <li>Account No</li>
+          <li>Sort Code</li>
+          <li>Account Holder Name</li>
+        </ul>
+        <p style="color: #666; font-size: 0.9rem;">💡 Make sure all required fields are filled and numeric values are valid.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Form Modal -->
+  <div id="formModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="formModalTitle">Add New Payroll Record</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <form id="payrollForm">
+        <input type="hidden" id="id" name="id">
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Client Name <span class="required">*</span></label>
+            <input type="text" id="clientName" name="clientName" required>
+          </div>
+          <div class="form-group">
+            <label>Guard Name <span class="required">*</span></label>
+            <input type="text" id="guardName" name="guardName" required>
+          </div>
+          <div class="form-group">
+            <label>Total Hours <span class="required">*</span></label>
+            <input type="number" id="totalHours" name="totalHours" step="0.5" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Pay Rate (£/hour) <span class="required">*</span></label>
+            <input type="number" id="payRate" name="payRate" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Charge Rate (£/hour) <span class="required">*</span></label>
+            <input type="number" id="chargeRate" name="chargeRate" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Pay 1 (£) <span class="required">*</span></label>
+            <input type="number" id="pay1" name="pay1" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Pay 2 (£) <span class="required">*</span></label>
+            <input type="number" id="pay2" name="pay2" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Pay 3 (£) <span class="required">*</span></label>
+            <input type="number" id="pay3" name="pay3" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Account Number <span class="required">*</span></label>
+            <input type="text" id="accountNo" name="accountNo" required>
+          </div>
+          <div class="form-group">
+            <label>Sort Code <span class="required">*</span></label>
+            <input type="text" id="sortCode" name="sortCode" placeholder="e.g., 20-20-20" required>
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name <span class="required">*</span></label>
+            <input type="text" id="accountHolderName" name="accountHolderName" required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save Record</button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('formModal').classList.remove('active')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    let uploadedRecords = [];
+
+    async function generatePayroll(recordIndex, payNumber) {
+      if (!uploadedRecords[recordIndex]) {
+        showAlert('Record not found', 'danger');
+        return;
+      }
+
+      const record = uploadedRecords[recordIndex];
+      
+      try {
+        const response = await fetch('/api/payroll/generate-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            payrollData: record,
+            payNumber: payNumber
+          })
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const filename = `Payroll_${String(payNumber).padStart(2, '0')}_${record.guardName}_${new Date().getTime()}.pdf`;
+          downloadFile(blob, filename);
+          showAlert(`Payroll ${String(payNumber).padStart(2, '0')} generated successfully`, 'success');
+        } else {
+          showAlert('Error generating payroll PDF', 'danger');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error generating payroll PDF', 'danger');
+      }
+    }
+
+    // Override displayUploadedData to store records
+    const originalDisplayUploadedData = window.displayUploadedData;
+    window.displayUploadedData = function(records) {
+      uploadedRecords = records;
+      originalDisplayUploadedData(records);
+    };
+
+    function downloadFile(blob, filename) {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+  </script>
+</body>
+</html>
