@@ -59,23 +59,30 @@ class EnhancedPayrollPDFGenerator {
    * Build the complete PDF content
    */
   buildPDFContent(doc, data) {
+    // Handle both array and object inputs - if array, use first element
+    const record = Array.isArray(data) ? data[0] : data;
+    
+    if (!record) {
+      throw new Error('No payroll data provided for PDF generation');
+    }
+    
     // Header
     this.addHeader(doc);
 
     // Guard Information Section
-    this.addGuardInformation(doc, data);
+    this.addGuardInformation(doc, record);
 
     // Visa & Immigration Section
-    this.addVisaInformation(doc, data);
+    this.addVisaInformation(doc, record);
 
     // Working Hours & Rates Section
-    this.addWorkingHoursSection(doc, data);
+    this.addWorkingHoursSection(doc, record);
 
     // Bank Account(s) Section
-    this.addBankAccountsSection(doc, data);
+    this.addBankAccountsSection(doc, record);
 
     // Payment Summary Section
-    this.addPaymentSummary(doc, data);
+    this.addPaymentSummary(doc, record);
 
     // Footer
     this.addFooter(doc);
@@ -232,6 +239,11 @@ class EnhancedPayrollPDFGenerator {
     const chargeRate = parseFloat(data.chargeRate) || 0;
     const totalHoursDecimal = totalHours + totalMinutes / 60;
 
+    // Get hours distribution if available
+    const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || 0;
+    const associatedGuardHours = (data.hoursDistribution?.associatedGuardHours) || 0;
+    const associatedGuardName = (data.hoursDistribution?.associatedGuardName) || '';
+
     // Draw table
     this.drawTableRow(doc, tableX, doc.y, [
       { text: 'Total Hours', width: colWidth / 2 },
@@ -253,6 +265,27 @@ class EnhancedPayrollPDFGenerator {
       { text: 'Total Pay', width: colWidth / 2 },
       { text: '£' + (totalHoursDecimal * payRate).toFixed(2), width: colWidth / 2, isBold: true }
     ]);
+
+    // Add hours distribution section if applicable
+    if (primaryGuardHours > 0 || associatedGuardHours > 0) {
+      doc.y += 10;
+      this.drawTableRow(doc, tableX, doc.y, [
+        { text: 'Primary Guard Hours', width: colWidth / 2 },
+        { text: primaryGuardHours.toFixed(2), width: colWidth / 2 },
+        { text: 'Associated Guard Hours', width: colWidth / 2 },
+        { text: associatedGuardHours.toFixed(2), width: colWidth / 2 }
+      ]);
+
+      // Associated guard info if present
+      if (associatedGuardName) {
+        this.drawTableRow(doc, tableX, doc.y, [
+          { text: 'Associated Guard', width: colWidth / 2 },
+          { text: associatedGuardName, width: colWidth / 2 },
+          { text: 'Guard Pay', width: colWidth / 2 },
+          { text: '£' + (associatedGuardHours * payRate).toFixed(2), width: colWidth / 2 }
+        ]);
+      }
+    }
 
     doc.y += 20;
   }
@@ -329,11 +362,16 @@ class EnhancedPayrollPDFGenerator {
     const totalPay = totalHoursDecimal * payRate;
     const totalCharge = totalHoursDecimal * chargeRate;
 
+    // Get hours distribution if available
+    const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || totalHoursDecimal;
+    const associatedGuardHours = (data.hoursDistribution?.associatedGuardHours) || 0;
+    const associatedGuardName = (data.hoursDistribution?.associatedGuardName) || '';
+
     const summaryBoxX = this.margin;
     const summaryBoxWidth = this.pageWidth - 2 * this.margin;
 
     // Summary box
-    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 80)
+    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 100)
       .stroke(this.borderColor);
 
     const summaryY = doc.y + 15;
@@ -349,6 +387,11 @@ class EnhancedPayrollPDFGenerator {
     doc.fillColor('#000000').font('Helvetica-Bold');
     doc.text('£' + payRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 10);
 
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Primary Guard Hours:', summaryBoxX + 20, summaryY + 40);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text(primaryGuardHours.toFixed(2) + ' hours', summaryBoxX + 150, summaryY + 30);
+
     // Right column
     doc.fontSize(12).font('Helvetica-Bold').fillColor(this.accentColor);
     doc.text('TOTAL PAY:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY);
@@ -360,7 +403,15 @@ class EnhancedPayrollPDFGenerator {
     doc.fillColor('#000000').font('Helvetica-Bold');
     doc.text('£' + chargeRate.toFixed(2) + '/hour', summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 10);
 
-    doc.y += 100;
+    // Associated guard info if present
+    if (associatedGuardHours > 0 && associatedGuardName) {
+      doc.fontSize(10).font('Helvetica').fillColor('#666666');
+      doc.text(associatedGuardName + ' Hours:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 40);
+      doc.fillColor('#000000').font('Helvetica-Bold');
+      doc.text(associatedGuardHours.toFixed(2) + ' hours', summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 30);
+    }
+
+    doc.y += 120;
   }
 
   /**

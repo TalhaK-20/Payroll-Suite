@@ -1035,6 +1035,8 @@ async function handleFiles(files) {
     const data = await response.json();
 
     if (data.success) {
+      // Store records for batch export
+      window.uploadedRecords = data.data;
       displayUploadedData(data.data);
       showAlert(`Successfully imported ${data.data.length} records`, 'success');
     } else {
@@ -1051,42 +1053,47 @@ function displayUploadedData(records) {
   if (!container) return;
 
   const tableHtml = `
-    <table>
-      <thead>
-        <tr>
-          <th>Client Name</th>
-          <th>Guard Name</th>
-          <th>Total Hours</th>
-          <th>Pay Rate</th>
-          <th>Pay 1</th>
-          <th>Pay 2</th>
-          <th>Pay 3</th>
-          <th>Account No</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${records.map((record, idx) => `
+    <div class="upload-table-wrapper">
+      <div class="upload-table-controls">
+        <button class="btn btn-export-primary" onclick="exportAllRecordsToDatabase()">
+          <i>✓</i> Export All to Database
+        </button>
+      </div>
+      <table class="upload-preview-table">
+        <thead>
           <tr>
-            <td>${record.clientName}</td>
-            <td>${record.guardName}</td>
-            <td>${record.totalHours}</td>
-            <td>£${record.payRate.toFixed(2)}</td>
-            <td>£${record.pay1.toFixed(2)}</td>
-            <td>£${record.pay2.toFixed(2)}</td>
-            <td>£${record.pay3.toFixed(2)}</td>
-            <td>${record.accountNo}</td>
-            <td>
-              <div class="btn-group">
-                <button class="btn btn-payroll btn-success" onclick="generatePayroll(${idx}, 1)">Payroll 01</button>
-                <button class="btn btn-payroll btn-info" onclick="generatePayroll(${idx}, 2)">Payroll 02</button>
-                <button class="btn btn-payroll btn-warning" onclick="generatePayroll(${idx}, 3)">Payroll 03</button>
-              </div>
-            </td>
+            <th>Client Name</th>
+            <th>Guard Name</th>
+            <th>Total Hours</th>
+            <th>Pay Rate</th>
+            <th>Charge Rate</th>
+            <th>Pay 1</th>
+            <th>Pay 2</th>
+            <th>Pay 3</th>
+            <th>Account Holder</th>
+            <th>Account No</th>
+            <th>Sort Code</th>
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${records.map((record, idx) => `
+            <tr>
+              <td>${record.clientName}</td>
+              <td>${record.guardName}</td>
+              <td>${record.totalHours.toFixed(2)}</td>
+              <td>£${record.payRate.toFixed(2)}</td>
+              <td>£${record.chargeRate.toFixed(2)}</td>
+              <td>£${record.pay1.toFixed(2)}</td>
+              <td>£${record.pay2.toFixed(2)}</td>
+              <td>£${record.pay3.toFixed(2)}</td>
+              <td>${record.accountHolderName || '-'}</td>
+              <td>${record.accountNo || '-'}</td>
+              <td>${record.sortCode || '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 
   container.innerHTML = tableHtml;
@@ -1096,9 +1103,46 @@ function displayUploadedData(records) {
 // Store uploaded data in window scope
 window.uploadedRecords = [];
 
-async function generatePayroll(recordIndex, payNumber) {
-  // This will be handled by the upload page with stored data
-  showAlert(`Generating Payroll ${String(payNumber).padStart(2, '0')}...`, 'info');
+async function exportAllRecordsToDatabase() {
+  if (!window.uploadedRecords || window.uploadedRecords.length === 0) {
+    showAlert('No records to export', 'warning');
+    return;
+  }
+  
+  try {
+    showAlert(`Exporting ${window.uploadedRecords.length} records...`, 'info');
+    
+    // Send all records to database
+    const response = await fetch('/api/payroll/batch-create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        records: window.uploadedRecords
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showAlert(`Successfully exported ${data.count} records to database`, 'success');
+      // Clear the upload table and form
+      document.getElementById('uploadedDataContainer').classList.add('hidden');
+      document.getElementById('fileInput').value = '';
+      window.uploadedRecords = [];
+      
+      // Navigate to home page after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    } else {
+      showAlert(`Error: ${data.message || 'Failed to export records'}`, 'danger');
+    }
+  } catch (error) {
+    console.error('Error exporting records:', error);
+    showAlert('Error exporting records to database', 'danger');
+  }
 }
 
 // ==================== UTILITIES ====================

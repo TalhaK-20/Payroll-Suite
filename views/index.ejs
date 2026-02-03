@@ -452,6 +452,30 @@
       line-height: 1.2;
     }
 
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .status-badge.status-pending {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .status-badge.status-ongoing {
+      background-color: #fff3e0;
+      color: #e65100;
+    }
+
+    .status-badge.status-completed {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+
     @media (max-width: 768px) {
       header nav ul {
         gap: 1rem;
@@ -545,15 +569,53 @@
           <div class="metric-unit">To be processed</div>
         </div>
 
-        <div class="metric-card danger">
+        <!-- <div class="metric-card danger" sty>
           <div class="metric-label">Expiring Alerts</div>
           <div class="metric-value" id="expiringAlerts">0</div>
           <div class="metric-unit">Share codes</div>
-        </div>
+        </div> -->
       </div>
       <!-- Recent Payroll Records -->
       <div class="payroll-section">
         <h3>📋 Recent Payroll Records</h3>
+        
+        <!-- Advanced Filters Section -->
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+          <h4 style="margin-top: 0; margin-bottom: 15px; color: #333; font-weight: 600;">🔍 Filter Records</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div>
+              <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Guard Name</label>
+              <input type="text" id="filterGuard" placeholder="Search guard name..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Insurance Number</label>
+              <input type="text" id="filterInsurance" placeholder="Search insurance number..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Visa Status</label>
+              <select id="filterVisa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="">-- All Statuses --</option>
+                <option value="Student">Student</option>
+                <option value="Skilled Worker">Skilled Worker</option>
+                <option value="PSW">PSW</option>
+                <option value="Dependent/Spouse">Dependent/Spouse</option>
+                <option value="Permanent Resident">Permanent Resident</option>
+                <option value="Settled Status">Settled Status</option>
+                <option value="Pre-Settled Status">Pre-Settled Status</option>
+                <option value="Refugee/Asylum">Refugee/Asylum</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Nationality</label>
+              <input type="text" id="filterNationality" placeholder="Search nationality..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+          </div>
+          <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <button onclick="applyFiltersIndex()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">🔎 Apply Filters</button>
+            <button onclick="resetFiltersIndex()" style="padding: 8px 16px; background: #f0f0f0; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: 500;">↺ Reset Filters</button>
+          </div>
+        </div>
+        
         <div class="payroll-records-container">
           <table class="payroll-table">
             <thead>
@@ -565,6 +627,7 @@
                 <th>Hours Spent</th>
                 <th>Remaining Hours</th>
                 <th>Associated Guard</th>
+                <th>Associated Hours</th>
                 <th>Total Pay</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -591,6 +654,40 @@
       </div>
     </div>
   </main>
+
+  <!-- Payroll Status Edit Modal -->
+  <div id="statusModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header-professional">
+        <h2>Edit Payroll Status</h2>
+        <button class="modal-close-btn" onclick="closeStatusModal()">✕</button>
+      </div>
+      
+      <div style="padding: 20px;">
+        <div id="payrollStatusDisplay" style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+          <p style="margin: 5px 0;"><strong>Guard:</strong> <span id="statusGuardName"></span></p>
+          <p style="margin: 5px 0;"><strong>Total Hours:</strong> <span id="statusTotalHours"></span></p>
+          <p style="margin: 5px 0;"><strong>Hours Spent:</strong> <span id="statusHoursSpent"></span></p>
+          <p style="margin: 5px 0;"><strong>Remaining Hours:</strong> <span id="statusRemainingHours"></span></p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 600; margin-bottom: 10px; color: #333;">Status</label>
+          <select id="statusInput" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+            <option value="pending">🔴 Pending (Not Started)</option>
+            <option value="ongoing">🟡 Ongoing (In Progress)</option>
+            <option value="completed">🟢 Completed</option>
+          </select>
+          <small style="display: block; margin-top: 5px; color: #666;">Note: Can only mark as "Completed" when remaining hours = 0</small>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button onclick="closeStatusModal()" style="padding: 10px; background: #f0f0f0; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: 500;">Cancel</button>
+          <button onclick="savePayrollStatus()" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Save Status</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Form Modal -->
   <div id="formModal" class="modal">
@@ -888,15 +985,32 @@
 
     // Load data when modal is opened
     document.addEventListener('DOMContentLoaded', () => {
-      // Hook to modal open
+      // Preload dropdown data
+      loadGuardsDropdownIndex();
+      loadClientsDropdownIndex();
+      loadBankAccountsDropdownIndex();
+      
+      // Load initial data
+      loadPayrollRecords();
+      loadMetrics();
+      
+      // Auto-refresh metrics every 10 seconds
+      setInterval(loadMetrics, 10000);
+      // Auto-refresh payroll records every 15 seconds
+      setInterval(loadPayrollRecords, 15000);
+      
+      // Hook to modal open for re-loading
       const formModal = document.getElementById('formModal');
       if (formModal) {
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
             if (mutation.attributeName === 'class' && formModal.classList.contains('active')) {
-              loadGuardsDropdownIndex();
-              loadClientsDropdownIndex();
-              loadBankAccountsDropdownIndex();
+              // Reload dropdown data when modal opens
+              setTimeout(() => {
+                loadGuardsDropdownIndex();
+                loadClientsDropdownIndex();
+                loadBankAccountsDropdownIndex();
+              }, 100);
             }
           });
         });
@@ -1177,8 +1291,8 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            const activeGuards = data.data.filter(g => g.active).length;
-            document.getElementById('totalGuards').textContent = activeGuards;
+            const activeGuards = data.data.filter(g => g.isActive !== false).length;
+            document.getElementById('totalGuards').textContent = activeGuards || 0;
           }
         })
         .catch(error => console.error('Error loading guards:', error));
@@ -1195,8 +1309,7 @@
 
             let totalHours = 0;
             let totalMinutes = 0;
-            let paidHours = 0;
-            let paidMinutes = 0;
+            let hoursSpent = 0;
             let todayHours = 0;
             let todayMinutes = 0;
             let pendingCount = 0;
@@ -1204,23 +1317,25 @@
 
             records.forEach(record => {
               const recordDate = new Date(record.createdAt);
+              const recordTotalHours = record.totalHours || 0;
+              const recordTotalMinutes = record.totalMinutes || 0;
               
-              // Count this month's records
+              // Count this month's total hours allocated
               if (recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear) {
-                totalHours += record.totalHours || 0;
-                totalMinutes += record.totalMinutes || 0;
+                totalHours += recordTotalHours;
+                totalMinutes += recordTotalMinutes;
                 
-                // Count paid hours (hours spent)
+                // Count hours actually spent (distributed)
                 if (record.hoursDistribution) {
-                  paidHours += (record.hoursDistribution.primaryGuardHours || 0);
-                  paidHours += (record.hoursDistribution.associatedGuardHours || 0);
+                  hoursSpent += (record.hoursDistribution.primaryGuardHours || 0);
+                  hoursSpent += (record.hoursDistribution.associatedGuardHours || 0);
                 }
               }
 
               // Count today's records
               if (recordDate.toDateString() === today.toDateString()) {
-                todayHours += record.totalHours || 0;
-                todayMinutes += record.totalMinutes || 0;
+                todayHours += recordTotalHours;
+                todayMinutes += recordTotalMinutes;
               }
 
               // Count pending payrolls
@@ -1248,13 +1363,13 @@
             // Update metric boxes
             document.getElementById('totalHoursValue').textContent = totalHours;
             document.getElementById('totalMinutesValue').textContent = totalMinutes;
-            document.getElementById('paidHoursValue').textContent = Math.floor(paidHours);
-            document.getElementById('paidMinutesValue').textContent = Math.floor((paidHours % 1) * 60);
+            document.getElementById('paidHoursValue').textContent = Math.floor(hoursSpent);
+            document.getElementById('paidMinutesValue').textContent = Math.floor((hoursSpent % 1) * 60);
             document.getElementById('totalHoursAdded').textContent = todayHours;
             document.getElementById('totalHoursAddedMinutes').textContent = todayMinutes;
             
             const totalHoursDecimal = totalHours + (totalMinutes / 60);
-            const remainingHours = totalHoursDecimal - paidHours;
+            const remainingHours = totalHoursDecimal - hoursSpent;
             document.getElementById('remainingHoursValue').textContent = Math.floor(remainingHours);
             document.getElementById('remainingMinutesValue').textContent = Math.floor((remainingHours % 1) * 60);
             
@@ -1281,14 +1396,212 @@
             document.getElementById('insuranceNumber').value = record.insuranceNumber || '';
             document.getElementById('visaStatus').value = record.visaStatus || '';
             document.getElementById('siteName').value = record.siteName || '';
+            document.getElementById('clientId').value = record.clientId || '';
             document.getElementById('clientName').value = record.clientName || '';
+            document.getElementById('britishPassport').checked = record.britishPassport || false;
+            document.getElementById('shareCode').value = record.shareCode || '';
+            document.getElementById('shareCodeExpiryDate').value = record.shareCodeExpiryDate ? record.shareCodeExpiryDate.split('T')[0] : '';
+            
+            // Toggle share code fields visibility based on british passport setting
+            setTimeout(() => {
+              toggleShareCodeFields();
+            }, 100);
             document.getElementById('totalHours').value = record.totalHours || 0;
             document.getElementById('totalMinutes').value = record.totalMinutes || 0;
             document.getElementById('chargeRate').value = record.chargeRate || 0;
             document.getElementById('payRate').value = record.payRate || 0;
+            document.getElementById('pay1').value = record.pay1 || 0;
+            document.getElementById('pay2').value = record.pay2 || 0;
+            document.getElementById('pay3').value = record.pay3 || 0;
+            
+            // Associated guard details - properly populate from dropdown
+            if (record.hoursDistribution) {
+              document.getElementById('associatedGuardId').value = record.hoursDistribution.associatedGuardId || '';
+              document.getElementById('associatedGuardName').value = record.hoursDistribution.associatedGuardName || '';
+              document.getElementById('associatedGuardHours').value = record.hoursDistribution.associatedGuardHours || 0;
+              document.getElementById('primaryGuardHours').value = record.hoursDistribution.primaryGuardHours || 0;
+              // Trigger dropdown update to ensure name is synced
+              updateAssociatedGuardNameIndex();
+            }
+            
+            // Populate bank accounts
+            const bankAccountsContainer = document.getElementById('bankAccountsContainer');
+            bankAccountsContainer.innerHTML = ''; // Clear existing accounts
+            
+            if (record.bankAccounts && record.bankAccounts.length > 0) {
+              // Populate from bankAccounts array
+              record.bankAccounts.forEach((account, index) => {
+                // Create the account card HTML
+                const accountHTML = `
+                  <div class="bank-account-card" id="bankAccount-${index}" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-bottom: 15px; background: #f9f9f9;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                      <h4 style="margin: 0;">Bank Account ${index + 1}</h4>
+                      ${index > 0 ? `
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeBankAccount(${index})">
+                          🗑️ Remove
+                        </button>
+                      ` : ''}
+                    </div>
+                    
+                    <div class="form-row-2col">
+                      <div class="form-group">
+                        <label>Account Holder Name</label>
+                        <input type="text" 
+                          id="accountHolderName-${index}" 
+                          name="bankAccounts[${index}][accountHolderName]" 
+                          placeholder="e.g., John Smith" 
+                          value="${account.accountHolderName || ''}">
+                        <small class="field-hint">Name on bank account</small>
+                      </div>
+                      <div class="form-group">
+                        <label>Bank Name</label>
+                        <input type="text" 
+                          id="bankName-${index}" 
+                          name="bankAccounts[${index}][bankName]" 
+                          placeholder="e.g., Barclays, HSBC, Lloyds"
+                          value="${account.bankName || ''}">
+                        <small class="field-hint">Bank name</small>
+                      </div>
+                    </div>
+                    
+                    <div class="form-row-2col">
+                      <div class="form-group">
+                        <label>Sort Code</label>
+                        <input type="text" 
+                          id="sortCode-${index}" 
+                          name="bankAccounts[${index}][sortCode]" 
+                          placeholder="e.g., 12-34-56"
+                          value="${account.sortCode || ''}">
+                        <small class="field-hint">Format: XX-XX-XX</small>
+                      </div>
+                      <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" 
+                          id="accountNumber-${index}" 
+                          name="bankAccounts[${index}][accountNumber]" 
+                          placeholder="e.g., 12345678"
+                          value="${account.accountNumber || ''}">
+                        <small class="field-hint">8-10 digit account number</small>
+                      </div>
+                    </div>
+                    
+                    <div class="form-row-2col">
+                      <div class="form-group">
+                        <label>
+                          <input type="checkbox" 
+                            id="isPrimary-${index}" 
+                            name="bankAccounts[${index}][isPrimary]"
+                            ${account.isPrimary ? 'checked' : ''}>
+                          Primary Account
+                        </label>
+                        <small class="field-hint">Main payment account</small>
+                      </div>
+                      <div class="form-group">
+                        <label>
+                          <input type="checkbox" 
+                            id="active-${index}" 
+                            name="bankAccounts[${index}][active]"
+                            ${account.active ? 'checked' : ''}>
+                          Active
+                        </label>
+                        <small class="field-hint">Account is active</small>
+                      </div>
+                    </div>
+                  </div>
+                `;
+                bankAccountsContainer.insertAdjacentHTML('beforeend', accountHTML);
+              });
+            } else if (record.accountHolderName || record.sortCode || record.accountNo) {
+              // Fall back to legacy flat fields if no bankAccounts array
+              const accountHTML = `
+                <div class="bank-account-card" id="bankAccount-0" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-bottom: 15px; background: #f9f9f9;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="margin: 0;">Bank Account 1</h4>
+                  </div>
+                  
+                  <div class="form-row-2col">
+                    <div class="form-group">
+                      <label>Account Holder Name</label>
+                      <input type="text" 
+                        id="accountHolderName-0" 
+                        name="bankAccounts[0][accountHolderName]" 
+                        placeholder="e.g., John Smith" 
+                        value="${record.accountHolderName || ''}">
+                      <small class="field-hint">Name on bank account</small>
+                    </div>
+                    <div class="form-group">
+                      <label>Bank Name</label>
+                      <input type="text" 
+                        id="bankName-0" 
+                        name="bankAccounts[0][bankName]" 
+                        placeholder="e.g., Barclays, HSBC, Lloyds">
+                      <small class="field-hint">Bank name</small>
+                    </div>
+                  </div>
+                  
+                  <div class="form-row-2col">
+                    <div class="form-group">
+                      <label>Sort Code</label>
+                      <input type="text" 
+                        id="sortCode-0" 
+                        name="bankAccounts[0][sortCode]" 
+                        placeholder="e.g., 12-34-56"
+                        value="${record.sortCode || ''}">
+                      <small class="field-hint">Format: XX-XX-XX</small>
+                    </div>
+                    <div class="form-group">
+                      <label>Account Number</label>
+                      <input type="text" 
+                        id="accountNumber-0" 
+                        name="bankAccounts[0][accountNumber]" 
+                        placeholder="e.g., 12345678"
+                        value="${record.accountNo || ''}">
+                      <small class="field-hint">8-10 digit account number</small>
+                    </div>
+                  </div>
+                  
+                  <div class="form-row-2col">
+                    <div class="form-group">
+                      <label>
+                        <input type="checkbox" 
+                          id="isPrimary-0" 
+                          name="bankAccounts[0][isPrimary]"
+                          checked>
+                        Primary Account
+                      </label>
+                      <small class="field-hint">Main payment account</small>
+                    </div>
+                    <div class="form-group">
+                      <label>
+                        <input type="checkbox" 
+                          id="active-0" 
+                          name="bankAccounts[0][active]"
+                          checked>
+                        Active
+                      </label>
+                      <small class="field-hint">Account is active</small>
+                    </div>
+                  </div>
+                </div>
+              `;
+              bankAccountsContainer.insertAdjacentHTML('beforeend', accountHTML);
+            } else {
+              // No bank account data, add empty card
+              if (typeof addBankAccount === 'function') {
+                addBankAccount();
+              }
+            }
             
             // Update title
             document.getElementById('formModalTitle').textContent = 'Edit Payroll Record';
+            
+            // Recalculate and display all pay distribution values
+            setTimeout(() => {
+              calculateTotalPay();
+              updatePayDistribution();
+              updateTotalHoursDisplayIndex();
+              updatePrimaryGuardHoursIndex();
+            }, 100);
             
             // Open modal
             openFormModal();
@@ -1323,14 +1636,379 @@
 
     function downloadPayrollPDF(payrollId) {
       // Open PDF generation in new tab
-      window.open(`/api/payroll/generate-pdf/${payrollId}`, '_blank');
+      window.open(`/api/export/payroll-pdf/${payrollId}`, '_blank');
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      loadMetrics();
+    async function updateGuardDetailsIndex() {
+      const guardId = document.getElementById('guardId').value;
+      if (guardId) {
+        const response = await fetch(`/api/guards/${guardId}`);
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('guardName').value = data.data.guardName || '';
+          document.getElementById('nationality').value = data.data.nationality || '';
+        }
+      }
+    }
+
+    async function updateAssociatedGuardNameIndex() {
+      const guardId = document.getElementById('associatedGuardId').value;
+      if (guardId) {
+        const response = await fetch(`/api/guards/${guardId}`);
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('associatedGuardName').value = data.data.guardName || '';
+        }
+      } else {
+        document.getElementById('associatedGuardName').value = '';
+      }
+    }
+
+    function updateClientNameIndex() {
+      const clientId = document.getElementById('clientId').value;
+      const selected = document.querySelector(`#clientId option[value="${clientId}"]`);
+      if (selected) {
+        document.getElementById('clientName').value = selected.textContent;
+      }
+    }
+
+    function updatePrimaryGuardHoursIndex() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const totalMinutes = parseFloat(document.getElementById('totalMinutes').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      
+      const totalHoursDecimal = totalHours + (totalMinutes / 60);
+      const primaryHours = totalHoursDecimal - associatedHours;
+      
+      document.getElementById('primaryGuardHours').value = primaryHours > 0 ? primaryHours.toFixed(2) : 0;
+    }
+
+    function updateTotalHoursDisplayIndex() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const totalMinutes = parseFloat(document.getElementById('totalMinutes').value) || 0;
+      const totalHoursDecimal = totalHours + (totalMinutes / 60);
+      
+      const primaryHours = parseFloat(document.getElementById('primaryGuardHours').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      
+      document.getElementById('primaryHoursSummaryIndex').textContent = primaryHours.toFixed(1);
+      document.getElementById('associatedHoursSummaryIndex').textContent = associatedHours.toFixed(1);
+      document.getElementById('totalHoursSummaryIndex').textContent = totalHoursDecimal.toFixed(1);
+    }
+
+    function updateAssociatedGuardPayIndex() {
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const payRate = parseFloat(document.getElementById('associatedGuardPayRate').value) || 0;
+      const associatedPay = associatedHours * payRate;
+      document.getElementById('associatedGuardPay').value = associatedPay.toFixed(2);
+    }
+
+    async function loadGuardsDropdownIndex() {
+      const response = await fetch('/api/guards');
+      const data = await response.json();
+      if (data.success) {
+        const dropdown = document.getElementById('guardId');
+        const associatedDropdown = document.getElementById('associatedGuardId');
+        
+        dropdown.innerHTML = '<option value="">Select Guard</option>' +
+          data.data.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
+        
+        associatedDropdown.innerHTML = '<option value="">None</option>' +
+          data.data.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
+      }
+    }
+
+    async function loadClientsDropdownIndex() {
+      const response = await fetch('/api/clients');
+      const data = await response.json();
+      if (data.success) {
+        const dropdown = document.getElementById('clientId');
+        dropdown.innerHTML = '<option value="">Select Client</option>' +
+          data.data.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+      }
+    }
+
+    async function loadBankAccountsDropdownIndex() {
+      const response = await fetch('/api/bank-accounts');
+      const data = await response.json();
+      if (data.success) {
+        // Bank accounts are managed through the bank account cards, not in dropdown
+      }
+    }
+
+    function openFormModal() {
+      const modal = document.getElementById('formModal');
+      if (modal) {
+        modal.classList.add('active');
+      }
+    }
+
+    function openAddForm() {
+      document.getElementById('id').value = '';
+      document.getElementById('formModalTitle').textContent = 'Add New Payroll Record';
+      document.getElementById('payrollForm').reset();
+      
+      // Clear bank accounts and add one empty
+      const container = document.getElementById('bankAccountsContainer');
+      container.innerHTML = '';
+      setTimeout(() => {
+        if (typeof addBankAccount === 'function') {
+          addBankAccount();
+        }
+      }, 100);
+      
+      openFormModal();
+      
+      // Load dropdowns
+      loadGuardsDropdownIndex();
+      loadClientsDropdownIndex();
+      loadBankAccountsDropdownIndex();
+    }
+
+    async function loadPayrollRecords() {
+      try {
+        const response = await fetch('/api/payroll');
+        const result = await response.json();
+
+        if (result.success) {
+          const tbody = document.getElementById('payrollRecordsBody');
+          
+          if (result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem;">No payroll records found</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = result.data.map(item => {
+            const totalHours = item.totalHours || 0;
+            const totalMinutes = item.totalMinutes || 0;
+            const totalHoursDecimal = totalHours + (totalMinutes / 60);
+            
+            const hoursSpent = (item.hoursDistribution?.primaryGuardHours || 0) +
+                              (item.hoursDistribution?.associatedGuardHours || 0);
+            const remainingHours = totalHoursDecimal - hoursSpent;
+            
+            const totalPay = totalHoursDecimal * (item.payRate || 0);
+            const associatedGuardName = item.hoursDistribution?.associatedGuardName || '-';
+            const associatedGuardHours = (item.hoursDistribution?.associatedGuardHours || 0).toFixed(2);
+            
+            // Color coding for rows based on status
+            let rowBgColor = '#fff';
+            if (item.status === 'completed') {
+              rowBgColor = '#e8f5e9';
+            } else if (item.status === 'ongoing') {
+              rowBgColor = '#fff9c4';
+            } else if (item.status === 'pending') {
+              rowBgColor = '#ffebee';
+            }
+            
+            return `
+              <tr style="background-color: ${rowBgColor};">
+                <td>${item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}</td>
+                <td><strong>${item.guardName || '-'}</strong></td>
+                <td>${item.clientName || '-'}</td>
+                <td>${totalHours}h ${totalMinutes}m</td>
+                <td>${hoursSpent.toFixed(2)}h</td>
+                <td>${remainingHours > 0 ? remainingHours.toFixed(2) + 'h' : '0h'}</td>
+                <td>${associatedGuardName}</td>
+                <td>${associatedGuardName !== '-' ? associatedGuardHours + 'h' : '-'}</td>
+                <td>£${totalPay.toFixed(2)}</td>
+                <td>
+                  <button onclick="openStatusModal('${item._id}')" style="background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;" 
+                    class="status-badge status-${item.status || 'pending'}">
+                    ${item.status === 'completed' ? '🟢 Completed' : item.status === 'ongoing' ? '🟡 Ongoing' : '🔴 Pending'}
+                  </button>
+                </td>
+                <td>
+                  <button class="action-btn edit-btn" onclick="editPayroll('${item._id}')" title="Edit">✏️</button>
+                  <button class="action-btn pdf-btn" onclick="downloadPayrollPDF('${item._id}')" title="PDF">📄</button>
+                  <button class="action-btn delete-btn" onclick="deletePayroll('${item._id}')" title="Delete">🗑️</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading payroll records:', error);
+      }
+    }
+
+    async function applyFiltersIndex() {
+      const guardName = document.getElementById('filterGuard')?.value || '';
+      const insuranceNumber = document.getElementById('filterInsurance')?.value || '';
+      const visaStatus = document.getElementById('filterVisa')?.value || '';
+      const nationality = document.getElementById('filterNationality')?.value || '';
+
+      const params = new URLSearchParams();
+      if (guardName) params.append('guardName', guardName);
+      if (insuranceNumber) params.append('insuranceNumber', insuranceNumber);
+      if (visaStatus) params.append('visaStatus', visaStatus);
+      if (nationality) params.append('nationality', nationality);
+
+      try {
+        const response = await fetch(`/api/payroll/filter?${params}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const tbody = document.getElementById('payrollRecordsBody');
+          if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem;">No records match your filters</td></tr>';
+            return;
+          }
+          
+          tbody.innerHTML = data.data.map(item => {
+            const totalHours = item.totalHours || 0;
+            const totalMinutes = item.totalMinutes || 0;
+            const totalHoursDecimal = totalHours + (totalMinutes / 60);
+            
+            const hoursSpent = (item.hoursDistribution?.primaryGuardHours || 0) +
+                              (item.hoursDistribution?.associatedGuardHours || 0);
+            const remainingHours = totalHoursDecimal - hoursSpent;
+            
+            const totalPay = totalHoursDecimal * (item.payRate || 0);
+            const associatedGuardName = item.hoursDistribution?.associatedGuardName || '-';
+            const associatedGuardHours = (item.hoursDistribution?.associatedGuardHours || 0).toFixed(2);
+            
+            // Color coding for rows based on status
+            let rowBgColor = '#fff';
+            if (item.status === 'completed') {
+              rowBgColor = '#e8f5e9';
+            } else if (item.status === 'ongoing') {
+              rowBgColor = '#fff9c4';
+            } else if (item.status === 'pending') {
+              rowBgColor = '#ffebee';
+            }
+            
+            return `
+              <tr style="background-color: ${rowBgColor};">
+                <td>${item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}</td>
+                <td><strong>${item.guardName || '-'}</strong></td>
+                <td>${item.clientName || '-'}</td>
+                <td>${totalHours}h ${totalMinutes}m</td>
+                <td>${hoursSpent.toFixed(2)}h</td>
+                <td>${remainingHours > 0 ? remainingHours.toFixed(2) + 'h' : '0h'}</td>
+                <td>${associatedGuardName}</td>
+                <td>${associatedGuardName !== '-' ? associatedGuardHours + 'h' : '-'}</td>
+                <td>£${totalPay.toFixed(2)}</td>
+                <td>
+                  <button onclick="openStatusModal('${item._id}')" style="background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;" 
+                    class="status-badge status-${item.status || 'pending'}">
+                    ${item.status === 'completed' ? '🟢 Completed' : item.status === 'ongoing' ? '🟡 Ongoing' : '🔴 Pending'}
+                  </button>
+                </td>
+                <td>
+                  <button class="action-btn edit-btn" onclick="editPayroll('${item._id}')" title="Edit">✏️</button>
+                  <button class="action-btn pdf-btn" onclick="downloadPayrollPDF('${item._id}')" title="PDF">📄</button>
+                  <button class="action-btn delete-btn" onclick="deletePayroll('${item._id}')" title="Delete">🗑️</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error applying filters:', error);
+      }
+    }
+
+    function resetFiltersIndex() {
+      document.getElementById('filterGuard').value = '';
+      document.getElementById('filterInsurance').value = '';
+      document.getElementById('filterVisa').value = '';
+      document.getElementById('filterNationality').value = '';
       loadPayrollRecords();
-      renderPayrollCalendar();
-    });
+    }
+
+    let currentEditingPayrollId = null;
+
+    function openStatusModal(payrollId) {
+      // Fetch the payroll record
+      fetch(`/api/payroll/${payrollId}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const record = data.data;
+            currentEditingPayrollId = payrollId;
+            
+            // Calculate values
+            const totalHours = record.totalHours || 0;
+            const totalMinutes = record.totalMinutes || 0;
+            const totalHoursDecimal = totalHours + (totalMinutes / 60);
+            
+            const hoursSpent = (record.hoursDistribution?.primaryGuardHours || 0) +
+                              (record.hoursDistribution?.associatedGuardHours || 0);
+            const remainingHours = totalHoursDecimal - hoursSpent;
+            
+            // Populate modal
+            document.getElementById('statusGuardName').textContent = record.guardName || 'N/A';
+            document.getElementById('statusTotalHours').textContent = totalHoursDecimal.toFixed(2) + ' hours';
+            document.getElementById('statusHoursSpent').textContent = hoursSpent.toFixed(2) + ' hours';
+            document.getElementById('statusRemainingHours').textContent = remainingHours.toFixed(2) + ' hours';
+            document.getElementById('statusInput').value = record.status || 'pending';
+            
+            // Show modal
+            document.getElementById('statusModal').classList.add('active');
+          }
+        })
+        .catch(error => console.error('Error loading payroll:', error));
+    }
+
+    function closeStatusModal() {
+      document.getElementById('statusModal').classList.remove('active');
+      currentEditingPayrollId = null;
+    }
+
+    function savePayrollStatus() {
+      const status = document.getElementById('statusInput').value;
+      
+      if (!currentEditingPayrollId) {
+        alert('Error: No payroll selected');
+        return;
+      }
+      
+      // Fetch the record to check remaining hours
+      fetch(`/api/payroll/${currentEditingPayrollId}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const record = data.data;
+            const totalHoursDecimal = (record.totalHours || 0) + ((record.totalMinutes || 0) / 60);
+            const hoursSpent = (record.hoursDistribution?.primaryGuardHours || 0) +
+                              (record.hoursDistribution?.associatedGuardHours || 0);
+            const remainingHours = totalHoursDecimal - hoursSpent;
+            
+            // Check if trying to mark as completed with pending hours
+            if (status === 'completed' && remainingHours > 0) {
+              alert(`Cannot mark as completed. Remaining hours: ${remainingHours.toFixed(2)}h`);
+              return;
+            }
+            
+            // Update only the status field (don't send entire record)
+            fetch(`/api/payroll/${currentEditingPayrollId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                status: status
+              })
+            })
+            .then(response => response.json())
+            .then(result => {
+              if (result.success) {
+                alert('Status updated successfully');
+                closeStatusModal();
+                loadPayrollRecords();
+              } else {
+                alert('Error updating status: ' + result.message);
+              }
+            })
+            .catch(error => {
+              console.error('Error updating status:', error);
+              alert('Error updating status');
+            });
+          }
+        })
+        .catch(error => console.error('Error:', error));
+    }
   </script>
 </body>
 </html>

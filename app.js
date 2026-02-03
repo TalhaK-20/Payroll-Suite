@@ -98,8 +98,33 @@ mongoose.connect(mongoUri, {
   });
 
 // Handle connection events
-mongoose.connection.on('connected', () => {
+mongoose.connection.on('connected', async () => {
   console.log('✅ Mongoose connected to database');
+  
+  // Fix the insuranceNumber index to be sparse (allow multiple empty values)
+  try {
+    // Drop the old unique index if it exists
+    const collection = mongoose.connection.collection('payrolls');
+    const indexes = await collection.listIndexes().toArray();
+    const insuranceIndex = indexes.find(idx => idx.key.insuranceNumber === 1);
+    
+    if (insuranceIndex && insuranceIndex.unique) {
+      console.log('🔄 Dropping old unique index on insuranceNumber...');
+      await collection.dropIndex('insuranceNumber_1');
+      console.log('✅ Old index dropped');
+      
+      // Recreate with sparse option
+      console.log('🔄 Creating sparse unique index on insuranceNumber...');
+      await collection.createIndex({ insuranceNumber: 1 }, { unique: true, sparse: true });
+      console.log('✅ Sparse unique index created - allows multiple empty values');
+    }
+  } catch (err) {
+    if (err.message.includes('index not found')) {
+      console.log('ℹ️ insuranceNumber index does not exist, will be created by Mongoose');
+    } else {
+      console.error('⚠️ Error managing indexes:', err.message);
+    }
+  }
 });
 
 mongoose.connection.on('error', (err) => {
@@ -1292,7 +1317,7 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
       // Basic info
       clientName: req.body.clientName,
       guardName: req.body.guardName,
-      guardId: req.body.guardId || null,
+      guardId: req.body.guardId && req.body.guardId !== '' ? req.body.guardId : null,
       siteName: req.body.siteName,
       
       // Visa information
@@ -1318,7 +1343,7 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
       hoursDistribution: {
         primaryGuardHours: parseFloat(req.body.primaryGuardHours) || parseFloat(req.body.totalHours) || 0,
         associatedGuardHours: parseFloat(req.body.associatedGuardHours) || 0,
-        associatedGuardId: req.body.associatedGuardId || null,
+        associatedGuardId: req.body.associatedGuardId && req.body.associatedGuardId !== '' ? req.body.associatedGuardId : null,
         associatedGuardName: req.body.associatedGuardName || ''
       },
       
@@ -1352,6 +1377,119 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
 });
 
 /**
+ * POST /api/payroll/batch-create - Create multiple payroll records from Excel import
+ */
+app.post('/api/payroll/batch-create', async (req, res) => {
+  try {
+    const { records } = req.body;
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No records provided for batch creation'
+      });
+    }
+
+    const savedRecords = [];
+    const errors = [];
+
+    // Process each record
+    for (let i = 0; i < records.length; i++) {
+      try {
+        const record = records[i];
+        
+        // Parse bank accounts
+        let bankAccounts = [];
+        if (record.bankAccounts && Array.isArray(record.bankAccounts)) {
+          bankAccounts = record.bankAccounts;
+        } else if (record.accountHolderName || record.sortCode || record.accountNo) {
+          // Build from flat fields if no structured data
+          bankAccounts.push({
+            accountHolderName: record.accountHolderName || '',
+            bankName: '',
+            sortCode: record.sortCode || '',
+            accountNumber: record.accountNo || '',
+            isPrimary: true,
+            active: true
+          });
+        }
+
+        const payrollData = {
+          // Basic info
+          clientName: record.clientName,
+          guardName: record.guardName,
+          guardId: record.guardId || null,
+          siteName: record.siteName || '',
+          
+          // Visa information
+          nationality: record.nationality || '',
+          insuranceNumber: record.insuranceNumber || '',
+          visaStatus: record.visaStatus || '',
+          britishPassport: record.britishPassport || false,
+          shareCode: record.shareCode || '',
+          shareCodeExpiryDate: record.shareCodeExpiryDate || null,
+          
+          // Hours
+          totalHours: parseFloat(record.totalHours) || 0,
+          totalMinutes: parseInt(record.totalMinutes) || 0,
+          
+          // Rates
+          payRate: parseFloat(record.payRate) || 0,
+          chargeRate: parseFloat(record.chargeRate) || 0,
+          
+          // Bank accounts
+          bankAccounts: bankAccounts,
+          
+          // Associated Guard Hour Distribution
+          hoursDistribution: {
+            primaryGuardHours: parseFloat(record.primaryGuardHours) || parseFloat(record.totalHours) || 0,
+            associatedGuardHours: parseFloat(record.associatedGuardHours) || 0,
+            associatedGuardId: record.associatedGuardId || null,
+            associatedGuardName: record.associatedGuardName || ''
+          },
+          
+          // Legacy fields for compatibility
+          pay1: parseFloat(record.pay1) || 0,
+          pay2: parseFloat(record.pay2) || 0,
+          pay3: parseFloat(record.pay3) || 0,
+          accountNo: record.accountNo || '',
+          sortCode: record.sortCode || '',
+          accountHolderName: record.accountHolderName || '',
+          
+          // Default status for batch imports
+          status: 'pending'
+        };
+
+        const newRecord = new Payroll(payrollData);
+        const savedRecord = await newRecord.save();
+        savedRecords.push(savedRecord);
+      } catch (recordError) {
+        console.error(`Error saving record ${i + 1}:`, recordError);
+        errors.push({
+          rowNumber: i + 1,
+          error: recordError.message
+        });
+      }
+    }
+
+    res.json({
+      success: errors.length === 0,
+      message: `Successfully imported ${savedRecords.length} records${errors.length > 0 ? ` (${errors.length} failed)` : ''}`,
+      count: savedRecords.length,
+      data: savedRecords,
+      errors: errors
+    });
+  } catch (error) {
+    console.error('Error in batch create:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating batch records',
+      error: error.message
+    });
+  }
+});
+
+/**
  * PUT /api/payroll/:id - Update payroll record
  */
 app.put('/api/payroll/:id', payrollValidationRules(), validate, async (req, res) => {
@@ -1363,46 +1501,69 @@ app.put('/api/payroll/:id', payrollValidationRules(), validate, async (req, res)
       });
     }
 
-    const updateData = {
-      // Basic info
-      clientName: req.body.clientName,
-      guardName: req.body.guardName,
-      siteName: req.body.siteName,
+    // Build update data only for fields that are provided
+    const updateData = {};
+    
+    // Handle optional fields - only set if provided
+    if (req.body.clientName !== undefined) updateData.clientName = req.body.clientName;
+    if (req.body.clientId !== undefined) updateData.clientId = req.body.clientId && req.body.clientId !== '' ? req.body.clientId : null;
+    if (req.body.guardName !== undefined) updateData.guardName = req.body.guardName;
+    if (req.body.guardId !== undefined) updateData.guardId = req.body.guardId && req.body.guardId !== '' ? req.body.guardId : null;
+    if (req.body.siteName !== undefined) updateData.siteName = req.body.siteName;
+    
+    // Visa information
+    if (req.body.nationality !== undefined) updateData.nationality = req.body.nationality;
+    if (req.body.insuranceNumber !== undefined) updateData.insuranceNumber = req.body.insuranceNumber;
+    if (req.body.visaStatus !== undefined) updateData.visaStatus = req.body.visaStatus;
+    if (req.body.britishPassport !== undefined) updateData.britishPassport = req.body.britishPassport === 'true' || req.body.britishPassport === true;
+    if (req.body.shareCode !== undefined) updateData.shareCode = req.body.shareCode;
+    if (req.body.shareCodeExpiryDate !== undefined) updateData.shareCodeExpiryDate = req.body.shareCodeExpiryDate;
+    
+    // Hours
+    if (req.body.totalHours !== undefined) updateData.totalHours = parseFloat(req.body.totalHours) || 0;
+    if (req.body.totalMinutes !== undefined) updateData.totalMinutes = parseInt(req.body.totalMinutes) || 0;
+    
+    // Rates
+    if (req.body.payRate !== undefined) updateData.payRate = parseFloat(req.body.payRate) || 0;
+    if (req.body.chargeRate !== undefined) updateData.chargeRate = parseFloat(req.body.chargeRate) || 0;
+    
+    // Bank accounts
+    if (req.body.bankAccounts !== undefined) {
+      updateData.bankAccounts = typeof req.body.bankAccounts === 'string' ? JSON.parse(req.body.bankAccounts) : req.body.bankAccounts;
+    }
+    
+    // Associated Guard Hour Distribution - preserve existing data
+    if (req.body.primaryGuardHours !== undefined || req.body.associatedGuardHours !== undefined || req.body.associatedGuardId !== undefined || req.body.associatedGuardName !== undefined) {
+      // Fetch existing record to preserve hoursDistribution
+      const existingRecord = await Payroll.findById(req.params.id);
       
-      // Visa information
-      nationality: req.body.nationality,
-      insuranceNumber: req.body.insuranceNumber,
-      visaStatus: req.body.visaStatus,
-      britishPassport: req.body.britishPassport === 'true' || req.body.britishPassport === true,
-      shareCode: req.body.shareCode,
-      shareCodeExpiryDate: req.body.shareCodeExpiryDate,
+      // Start with existing hoursDistribution or create new object
+      updateData.hoursDistribution = existingRecord && existingRecord.hoursDistribution ? { ...existingRecord.hoursDistribution.toObject ? existingRecord.hoursDistribution.toObject() : existingRecord.hoursDistribution } : {};
       
-      // Hours
-      totalHours: parseFloat(req.body.totalHours) || 0,
-      totalMinutes: parseInt(req.body.totalMinutes) || 0,
-      
-      // Rates
-      payRate: parseFloat(req.body.payRate) || 0,
-      chargeRate: parseFloat(req.body.chargeRate) || 0,
-      
-      // Bank accounts
-      bankAccounts: req.body.bankAccounts ? (typeof req.body.bankAccounts === 'string' ? JSON.parse(req.body.bankAccounts) : req.body.bankAccounts) : [],
-      
-      // Legacy fields for compatibility
-      pay1: parseFloat(req.body.pay1) || 0,
-      pay2: parseFloat(req.body.pay2) || 0,
-      pay3: parseFloat(req.body.pay3) || 0,
-      accountNo: req.body.accountNo,
-      sortCode: req.body.sortCode,
-      accountHolderName: req.body.accountHolderName,
-      
-      updatedAt: new Date()
-    };
+      // Only update provided fields
+      if (req.body.primaryGuardHours !== undefined) updateData.hoursDistribution.primaryGuardHours = parseFloat(req.body.primaryGuardHours) || 0;
+      if (req.body.associatedGuardHours !== undefined) updateData.hoursDistribution.associatedGuardHours = parseFloat(req.body.associatedGuardHours) || 0;
+      if (req.body.associatedGuardId !== undefined) updateData.hoursDistribution.associatedGuardId = req.body.associatedGuardId && req.body.associatedGuardId !== '' ? req.body.associatedGuardId : null;
+      if (req.body.associatedGuardName !== undefined) updateData.hoursDistribution.associatedGuardName = req.body.associatedGuardName || '';
+    }
+    
+    // Legacy fields for compatibility
+    if (req.body.pay1 !== undefined) updateData.pay1 = parseFloat(req.body.pay1) || 0;
+    if (req.body.pay2 !== undefined) updateData.pay2 = parseFloat(req.body.pay2) || 0;
+    if (req.body.pay3 !== undefined) updateData.pay3 = parseFloat(req.body.pay3) || 0;
+    if (req.body.accountNo !== undefined) updateData.accountNo = req.body.accountNo;
+    if (req.body.sortCode !== undefined) updateData.sortCode = req.body.sortCode;
+    if (req.body.accountHolderName !== undefined) updateData.accountHolderName = req.body.accountHolderName;
+    
+    // Status update
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    
+    updateData.updatedAt = new Date();
 
     const updatedRecord = await Payroll.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: false }
     );
 
     if (!updatedRecord) {
@@ -1713,6 +1874,46 @@ app.post('/api/export/enhanced-excel', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error exporting enhanced Excel',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/export/payroll-pdf/:id - Export single record as enhanced PDF
+ */
+app.get('/api/export/payroll-pdf/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ID format'
+      });
+    }
+
+    const record = await Payroll.findById(req.params.id);
+    
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Record not found'
+      });
+    }
+
+    const generator = new EnhancedPdfGenerator();
+    const pdfBuffer = await generator.generatePayrollPDF([record]);
+
+    const filename = `payroll_${record.guardName}_${Date.now()}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error exporting payroll PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting payroll PDF',
       error: error.message
     });
   }

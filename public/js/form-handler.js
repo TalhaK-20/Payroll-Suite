@@ -254,6 +254,7 @@ async function savePayrollRecord() {
     
     // Prepare data
     const data = {
+      guardId: document.getElementById('guardId').value || null,
       guardName: formData.get('guardName'),
       nationality: formData.get('nationality'),
       insuranceNumber: formData.get('insuranceNumber'),
@@ -267,6 +268,10 @@ async function savePayrollRecord() {
       totalMinutes: parseInt(formData.get('totalMinutes')) || 0,
       chargeRate: parseFloat(formData.get('chargeRate')) || 0,
       payRate: parseFloat(formData.get('payRate')) || 0,
+      primaryGuardHours: parseFloat(document.getElementById('primaryGuardHours').value) || 0,
+      associatedGuardHours: parseFloat(document.getElementById('associatedGuardHours').value) || 0,
+      associatedGuardId: document.getElementById('associatedGuardId').value || null,
+      associatedGuardName: document.getElementById('associatedGuardName').value || '',
       // Legacy fields for backward compatibility
       pay1: parseFloat(formData.get('pay1')) || 0,
       pay2: parseFloat(formData.get('pay2')) || 0,
@@ -299,7 +304,7 @@ async function savePayrollRecord() {
     
     // Make API request
     const method = recordId ? 'PUT' : 'POST';
-    const url = recordId ? `/update-record/${recordId}` : '/add-record';
+    const url = recordId ? `/api/payroll/${recordId}` : '/api/payroll';
     
     const response = await fetch(url, {
       method: method,

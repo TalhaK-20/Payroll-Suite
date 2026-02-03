@@ -241,7 +241,7 @@ payrollSchema.set('toObject', { virtuals: true });
 // Indexes for better query performance
 payrollSchema.index({ clientName: 1 });
 payrollSchema.index({ guardName: 1 });
-payrollSchema.index({ insuranceNumber: 1 }, { unique: true });
+payrollSchema.index({ insuranceNumber: 1 }, { unique: true, sparse: true });
 payrollSchema.index({ visaStatus: 1 });
 payrollSchema.index({ createdAt: -1 });
 

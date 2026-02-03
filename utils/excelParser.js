@@ -2,6 +2,21 @@ const XLSX = require('xlsx');
 const fs = require('fs');
 
 class ExcelParser {
+  /**
+   * Helper to find column by various name patterns
+   */
+  findColumn(row, patterns) {
+    const keys = Object.keys(row);
+    for (const pattern of patterns) {
+      for (const key of keys) {
+        if (key.toLowerCase().includes(pattern.toLowerCase())) {
+          return row[key];
+        }
+      }
+    }
+    return '';
+  }
+
   parseExcelFile(filePath) {
     try {
       const workbook = XLSX.readFile(filePath);
@@ -17,18 +32,45 @@ class ExcelParser {
       // Validate and transform data
       const transformedData = jsonData.map((row, index) => {
         try {
+          // Extract account fields using flexible column matching
+          const accountHolderName = String(
+            this.findColumn(row, ['account holder', 'account holder name', 'holder name']) || ''
+          ).trim();
+          const sortCode = String(
+            this.findColumn(row, ['sort code', 'sortcode', 'sort']) || ''
+          ).trim();
+          const accountNo = String(
+            this.findColumn(row, ['account no', 'account number', 'account num', 'accountno']) || ''
+          ).trim();
+          
+          // Build bank accounts array if we have account information
+          const bankAccounts = [];
+          if (accountHolderName || sortCode || accountNo) {
+            bankAccounts.push({
+              accountHolderName: accountHolderName,
+              bankName: '',
+              sortCode: sortCode,
+              accountNumber: accountNo,
+              isPrimary: true,
+              active: true
+            });
+          }
+          
           return {
-            clientName: String(row['Client Name'] || '').trim(),
-            guardName: String(row['Guard Name'] || '').trim(),
-            totalHours: this.parseNumber(row['Total Hours']),
-            payRate: this.parseNumber(row['Pay Rate']),
-            chargeRate: this.parseNumber(row['Charge Rate']),
-            pay1: this.parseNumber(row['Pay 1']),
-            pay2: this.parseNumber(row['Pay 2']),
-            pay3: this.parseNumber(row['Pay 3']),
-            accountNo: String(row['Account No'] || '').trim(),
-            sortCode: String(row['Sort Code'] || '').trim(),
-            accountHolderName: String(row['Account Holder Name'] || '').trim()
+            clientName: String(this.findColumn(row, ['client name', 'client']) || '').trim(),
+            guardName: String(this.findColumn(row, ['guard name', 'guard']) || '').trim(),
+            totalHours: this.parseNumber(this.findColumn(row, ['total hours', 'hours'])),
+            payRate: this.parseNumber(this.findColumn(row, ['pay rate', 'pay'])),
+            chargeRate: this.parseNumber(this.findColumn(row, ['charge rate', 'charge'])),
+            pay1: this.parseNumber(this.findColumn(row, ['pay 1', 'payroll 01', 'payroll 1'])),
+            pay2: this.parseNumber(this.findColumn(row, ['pay 2', 'payroll 02', 'payroll 2'])),
+            pay3: this.parseNumber(this.findColumn(row, ['pay 3', 'payroll 03', 'payroll 3'])),
+            // Keep flat fields for compatibility
+            accountNo: accountNo,
+            sortCode: sortCode,
+            accountHolderName: accountHolderName,
+            // Add structured bank accounts array
+            bankAccounts: bankAccounts
           };
         } catch (error) {
           throw new Error(`Error parsing row ${index + 1}: ${error.message}`);
@@ -71,15 +113,7 @@ class ExcelParser {
     data.forEach((row, index) => {
       const rowNum = index + 1;
 
-      // Only validate Client Name and Guard Name as required (essential for payroll)
-      if (!row.clientName) {
-        warnings.push(`Row ${rowNum}: Client Name is empty`);
-      }
-      if (!row.guardName) {
-        warnings.push(`Row ${rowNum}: Guard Name is empty`);
-      }
-
-      // Numeric fields validation - only warn if negative
+      // Minimal validation - only check for negative values if fields are provided
       if (row.totalHours < 0) {
         warnings.push(`Row ${rowNum}: Total Hours cannot be negative`);
       }
@@ -89,27 +123,10 @@ class ExcelParser {
       if (row.chargeRate < 0) {
         warnings.push(`Row ${rowNum}: Charge Rate cannot be negative`);
       }
-      if (row.pay1 < 0) {
-        warnings.push(`Row ${rowNum}: Pay 1 cannot be negative`);
-      }
-      if (row.pay2 < 0) {
-        warnings.push(`Row ${rowNum}: Pay 2 cannot be negative`);
-      }
-      if (row.pay3 < 0) {
-        warnings.push(`Row ${rowNum}: Pay 3 cannot be negative`);
-      }
-
-      // Warnings only for data quality
-      if (row.totalHours === 0) {
-        warnings.push(`Row ${rowNum}: Total Hours is 0`);
-      }
-      if (row.payRate === 0) {
-        warnings.push(`Row ${rowNum}: Pay Rate is 0`);
-      }
     });
 
     return {
-      isValid: errors.length === 0,
+      isValid: true,
       errors,
       warnings
     };
