@@ -14,12 +14,16 @@ const MonthlyHours = require('./models/MonthlyHours');
 const PayrollDeduction = require('./models/PayrollDeduction');
 const Alert = require('./models/Alert');
 const Client = require('./models/Client');
+const RosterEntry = require('./models/RosterEntry');
+const RosterMonthlyTarget = require('./models/RosterMonthlyTarget');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
 const EnhancedExcelGenerator = require('./utils/enhancedExcelGenerator');
 const payrollValidation = require('./utils/payrollValidation');
 const { setupPayrollRoutes } = require('./utils/payrollValidation');
+const monthlyAnalytics = require('./utils/monthlyAnalytics');
+const dataSynchronizer = require('./utils/dataSynchronizer');
 
 // Initialize Express app
 const app = express();
@@ -40,13 +44,36 @@ app.set('views', path.join(__dirname, 'views'));
 
 // ==================== MULTER CONFIGURATION ====================
 
+// Determine upload directory - use /tmp for serverless environments (Vercel, AWS Lambda, etc.)
+const getUploadDir = () => {
+  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY;
+  
+  if (isServerless) {
+    const tmpDir = path.join('/tmp', 'payroll_uploads');
+    // Create /tmp directory (this is writable on all serverless platforms)
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    return tmpDir;
+  }
+  
+  // For local development, use public/uploads
+  const uploadDir = path.join(__dirname, 'public/uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  return uploadDir;
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'public/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    try {
+      const uploadDir = getUploadDir();
+      cb(null, uploadDir);
+    } catch (error) {
+      console.error('Error creating upload directory:', error);
+      cb(error);
     }
-    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -105,13 +132,37 @@ mongoose.connection.on('connected', async () => {
   try {
     // Drop the old unique index if it exists
     const collection = mongoose.connection.collection('payrolls');
-    const indexes = await collection.listIndexes().toArray();
-    const insuranceIndex = indexes.find(idx => idx.key.insuranceNumber === 1);
+    
+    // Get indexes using the proper method for the MongoDB driver version
+    let indexes = [];
+    try {
+      const cursor = collection.listIndexes();
+      if (cursor && typeof cursor.toArray === 'function') {
+        indexes = await cursor.toArray();
+      } else if (cursor && cursor[Symbol.asyncIterator]) {
+        indexes = await cursor.map(idx => idx).toArray();
+      } else {
+        // Fallback: try to get from indexInformation
+        const indexInfo = await collection.indexInformation();
+        indexes = Object.entries(indexInfo).map(([name, spec]) => ({ key: spec[0], name }));
+      }
+    } catch (indexErr) {
+      console.log('ℹ️ Could not retrieve indexes:', indexErr.message);
+      indexes = [];
+    }
+    
+    const insuranceIndex = indexes.find(idx => idx.key && idx.key.insuranceNumber === 1);
     
     if (insuranceIndex && insuranceIndex.unique) {
       console.log('🔄 Dropping old unique index on insuranceNumber...');
-      await collection.dropIndex('insuranceNumber_1');
-      console.log('✅ Old index dropped');
+      try {
+        await collection.dropIndex('insuranceNumber_1');
+        console.log('✅ Old index dropped');
+      } catch (dropErr) {
+        if (!dropErr.message.includes('index not found')) {
+          console.error('⚠️ Error dropping index:', dropErr.message);
+        }
+      }
       
       // Recreate with sparse option
       console.log('🔄 Creating sparse unique index on insuranceNumber...');
@@ -119,11 +170,7 @@ mongoose.connection.on('connected', async () => {
       console.log('✅ Sparse unique index created - allows multiple empty values');
     }
   } catch (err) {
-    if (err.message.includes('index not found')) {
-      console.log('ℹ️ insuranceNumber index does not exist, will be created by Mongoose');
-    } else {
-      console.error('⚠️ Error managing indexes:', err.message);
-    }
+    console.error('⚠️ Non-critical: Error managing indexes:', err.message);
   }
 });
 
@@ -190,6 +237,13 @@ app.get('/dashboard', (req, res) => {
  */
 app.get('/reports', (req, res) => {
   res.render('reports');
+});
+
+/**
+ * GET /roster - Client roster page
+ */
+app.get('/roster', (req, res) => {
+  res.render('roster');
 });
 
 // ==================== API ROUTES - GUARD MASTER ====================
@@ -705,6 +759,7 @@ app.post('/api/monthly-hours', async (req, res) => {
 
     // Check for existing monthly hours
     let monthlyHours = await MonthlyHours.findOne({ guardId, year, month });
+    let isNew = !monthlyHours;
 
     if (monthlyHours) {
       // Update existing
@@ -725,9 +780,39 @@ app.post('/api/monthly-hours', async (req, res) => {
       await monthlyHours.save();
     }
 
-    res.status(monthlyHours._id ? 200 : 201).json({
+    // Auto-sync with payroll and validate consistency
+    try {
+      await dataSynchronizer.syncMonthlyHoursToPayroll({
+        guardId,
+        year,
+        month,
+        totalHours,
+        totalMinutes
+      });
+
+      // Validate data consistency
+      const validation = await dataSynchronizer.validateDataConsistency(
+        guardId,
+        year,
+        month
+      );
+
+      if (!validation.isConsistent) {
+        // Create alerts for any issues found
+        await dataSynchronizer.createConsistencyAlert(
+          guardId,
+          year,
+          month,
+          validation.issues
+        );
+      }
+    } catch (syncError) {
+      console.warn('Warning: Could not sync monthly hours to payroll:', syncError.message);
+    }
+
+    res.status(isNew ? 201 : 200).json({
       success: true,
-      message: monthlyHours._id ? 'Monthly hours updated' : 'Monthly hours created',
+      message: isNew ? 'Monthly hours created' : 'Monthly hours updated',
       data: monthlyHours
     });
   } catch (error) {
@@ -735,6 +820,32 @@ app.post('/api/monthly-hours', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error saving monthly hours',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/monthly-hours/analysis - Get filtered analysis data for UI
+ * MUST BE BEFORE /:id ROUTE to avoid Cast to ObjectId error
+ */
+app.get('/api/monthly-hours/analysis', async (req, res) => {
+  try {
+    const filters = {
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      guardId: req.query.guardId,
+      clientId: req.query.clientId,
+      status: req.query.status
+    };
+
+    const result = await monthlyAnalytics.getFilteredAnalysis(filters);
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting filtered analysis:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting filtered analysis',
       error: error.message
     });
   }
@@ -792,6 +903,307 @@ app.delete('/api/monthly-hours/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting monthly hours',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - MONTHLY ANALYTICS ====================
+
+/**
+ * GET /api/analytics/monthly - Get comprehensive monthly analytics
+ */
+app.get('/api/analytics/monthly', async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Year and month are required'
+      });
+    }
+
+    const analytics = await monthlyAnalytics.getMonthAnalytics(
+      parseInt(year),
+      parseInt(month)
+    );
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.error('Error fetching monthly analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching analytics',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/guard/:guardId - Get guard-specific analytics
+ */
+app.get('/api/analytics/guard/:guardId', async (req, res) => {
+  try {
+    const { guardId } = req.params;
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Year and month are required'
+      });
+    }
+
+    const analytics = await monthlyAnalytics.getGuardAnalytics(
+      guardId,
+      parseInt(year),
+      parseInt(month)
+    );
+
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error fetching guard analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching guard analytics',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - DATA SYNCHRONIZATION ====================
+
+/**
+ * POST /api/sync/payroll-to-monthly - Sync payroll data to monthly hours
+ */
+app.post('/api/sync/payroll-to-monthly', async (req, res) => {
+  try {
+    const payrollData = req.body;
+
+    if (!payrollData.guardId || !payrollData.totalHours) {
+      return res.status(400).json({
+        success: false,
+        message: 'Guard ID and total hours are required'
+      });
+    }
+
+    const result = await dataSynchronizer.syncPayrollToMonthlyHours(payrollData);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error syncing payroll to monthly hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error syncing data',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/sync/monthly-to-payroll - Sync monthly hours to payroll
+ */
+app.post('/api/sync/monthly-to-payroll', async (req, res) => {
+  try {
+    const monthlyHoursData = req.body;
+
+    if (!monthlyHoursData.guardId || !monthlyHoursData.year || !monthlyHoursData.month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Guard ID, year, and month are required'
+      });
+    }
+
+    const result = await dataSynchronizer.syncMonthlyHoursToPayroll(monthlyHoursData);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error syncing monthly hours to payroll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error syncing data',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/sync/validate - Validate data consistency
+ */
+app.post('/api/sync/validate', async (req, res) => {
+  try {
+    const { guardId, year, month } = req.body;
+
+    if (!guardId || !year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Guard ID, year, and month are required'
+      });
+    }
+
+    const validation = await dataSynchronizer.validateDataConsistency(
+      guardId,
+      parseInt(year),
+      parseInt(month)
+    );
+
+    // Create alerts if issues found
+    if (!validation.isConsistent && validation.issues.length > 0) {
+      await dataSynchronizer.createConsistencyAlert(
+        guardId,
+        parseInt(year),
+        parseInt(month),
+        validation.issues
+      );
+    }
+
+    res.json({
+      success: true,
+      validation: validation
+    });
+  } catch (error) {
+    console.error('Error validating data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error validating data',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/sync/status/:guardId - Get sync status for a guard
+ */
+app.get('/api/sync/status/:guardId', async (req, res) => {
+  try {
+    const { guardId } = req.params;
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Year and month are required'
+      });
+    }
+
+    const status = await dataSynchronizer.getSyncStatus(
+      guardId,
+      parseInt(year),
+      parseInt(month)
+    );
+
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    console.error('Error getting sync status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting sync status',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/sync/bulk-month - Bulk sync entire month
+ */
+app.post('/api/sync/bulk-month', async (req, res) => {
+  try {
+    const { year, month } = req.body;
+
+    if (!year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Year and month are required'
+      });
+    }
+
+    const results = await dataSynchronizer.bulkSyncMonth(
+      parseInt(year),
+      parseInt(month)
+    );
+
+    res.json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    console.error('Error in bulk sync:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error syncing month',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/monthly-hours/with-payroll - Get monthly hours with linked payroll data
+ */
+app.get('/api/monthly-hours/with-payroll', async (req, res) => {
+  try {
+    const { guardId, year, month } = req.query;
+
+    if (!guardId || !year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Guard ID, year, and month are required'
+      });
+    }
+
+    // Get monthly hours
+    const monthlyHours = await MonthlyHours.findOne({
+      guardId,
+      year: parseInt(year),
+      month: parseInt(month)
+    }).populate('guardId', 'guardName email');
+
+    if (!monthlyHours) {
+      return res.status(404).json({
+        success: false,
+        message: 'Monthly hours record not found'
+      });
+    }
+
+    // Get payroll data for the same period
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(month), 0);
+
+    const payrollData = await Payroll.find({
+      guardId,
+      createdAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    }).lean();
+
+    // Get analytics for this guard
+    const guardAnalytics = await monthlyAnalytics.getGuardAnalytics(
+      guardId,
+      parseInt(year),
+      parseInt(month)
+    );
+
+    res.json({
+      success: true,
+      data: {
+        monthlyHours: monthlyHours,
+        payrollRecords: payrollData,
+        analytics: guardAnalytics.success ? guardAnalytics.data : null,
+        totalPayroll: payrollData.reduce((sum, p) => sum + ((p.pay1 || 0) + (p.pay2 || 0) + (p.pay3 || 0)), 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching monthly hours with payroll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching data',
       error: error.message
     });
   }
@@ -1187,7 +1599,37 @@ app.get('/api/dashboard-metrics', async (req, res) => {
  */
 app.get('/api/payroll', async (req, res) => {
   try {
-    const records = await Payroll.find().sort({ createdAt: -1 });
+    let query = {};
+
+    // Date filter
+    if (req.query.date) {
+      const date = new Date(req.query.date);
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      
+      query.createdAt = {
+        $gte: date,
+        $lt: nextDate
+      };
+    }
+
+    // Client ID filter
+    if (req.query.clientId) {
+      query.clientId = req.query.clientId;
+    }
+
+    const records = await Payroll.find(query)
+      .populate({
+        path: 'guardId',
+        select: 'guardName email phoneNumber clientId'
+      })
+      .populate({
+        path: 'hoursDistribution.associatedGuardId',
+        select: 'guardName email phoneNumber',
+        model: 'Payroll'
+      })
+      .sort({ createdAt: -1 });
+    
     res.json({
       success: true,
       data: records,
@@ -1235,7 +1677,17 @@ app.get('/api/payroll/filter', async (req, res) => {
       query.clientName = { $regex: req.query.clientName, $options: 'i' };
     }
 
-    const records = await Payroll.find(query).sort({ createdAt: -1 });
+    const records = await Payroll.find(query)
+      .populate({
+        path: 'guardId',
+        select: 'guardName email phoneNumber clientId'
+      })
+      .populate({
+        path: 'hoursDistribution.associatedGuardId',
+        select: 'guardName email phoneNumber',
+        model: 'Payroll'
+      })
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -1265,7 +1717,16 @@ app.get('/api/payroll/:id', async (req, res) => {
       });
     }
 
-    const record = await Payroll.findById(req.params.id);
+    const record = await Payroll.findById(req.params.id)
+      .populate({
+        path: 'guardId',
+        select: 'guardName email phoneNumber clientId'
+      })
+      .populate({
+        path: 'hoursDistribution.associatedGuardId',
+        select: 'guardName email phoneNumber',
+        model: 'Payroll'
+      });
     
     if (!record) {
       return res.status(404).json({
@@ -1358,8 +1819,34 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
 
     console.log('Payroll Data to save:', JSON.stringify(payrollData, null, 2));
 
+    // Check for duplicate insurance number if provided
+    if (payrollData.insuranceNumber && payrollData.insuranceNumber.trim() !== '') {
+      const duplicateRecord = await Payroll.findOne({
+        insuranceNumber: payrollData.insuranceNumber.trim()
+      });
+      if (duplicateRecord) {
+        return res.status(400).json({
+          success: false,
+          message: 'This insurance number is already in use. Please use a unique number.'
+        });
+      }
+    } else {
+      // Set to null if empty to avoid unique index issues
+      payrollData.insuranceNumber = null;
+    }
+
     const newRecord = new Payroll(payrollData);
     const savedRecord = await newRecord.save();
+
+    // Auto-sync with monthly hours
+    try {
+      if (savedRecord.guardId && savedRecord.totalHours) {
+        await dataSynchronizer.syncPayrollToMonthlyHours(savedRecord.toObject());
+      }
+    } catch (syncError) {
+      console.warn('Warning: Could not sync payroll to monthly hours:', syncError.message);
+      // Don't fail the entire request if sync fails
+    }
 
     res.json({
       success: true,
@@ -1368,6 +1855,19 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
     });
   } catch (error) {
     console.error('Error creating payroll record:', error);
+    
+    // Handle MongoDB duplicate key error (E11000)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      const value = error.keyValue?.[field];
+      
+      return res.status(400).json({
+        success: false,
+        message: `This ${field} "${value}" is already in use. Please use a unique value.`,
+        errorCode: 'DUPLICATE_KEY'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error creating record',
@@ -1463,6 +1963,16 @@ app.post('/api/payroll/batch-create', async (req, res) => {
         const newRecord = new Payroll(payrollData);
         const savedRecord = await newRecord.save();
         savedRecords.push(savedRecord);
+
+        // Auto-sync with monthly hours for each record
+        try {
+          if (savedRecord.guardId && savedRecord.totalHours) {
+            await dataSynchronizer.syncPayrollToMonthlyHours(savedRecord.toObject());
+          }
+        } catch (syncError) {
+          console.warn(`Warning: Could not sync record ${i + 1} to monthly hours:`, syncError.message);
+          // Don't fail if sync fails - continue with next record
+        }
       } catch (recordError) {
         console.error(`Error saving record ${i + 1}:`, recordError);
         errors.push({
@@ -1619,6 +2129,377 @@ app.delete('/api/payroll/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting record',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - ROSTER ====================
+
+/**
+ * GET /api/roster - Get roster data for a date range (defaults to current week)
+ */
+app.get('/api/roster', async (req, res) => {
+  try {
+    const parseDate = (value) => {
+      if (!value || typeof value !== 'string') return null;
+      const parts = value.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return null;
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
+
+    const toDateString = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const now = new Date();
+    const startInput = parseDate(req.query.start);
+    const endInput = parseDate(req.query.end);
+
+    // Default to current week (Monday-Sunday)
+    const day = now.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const defaultStart = new Date(now);
+    defaultStart.setDate(now.getDate() - diffToMonday);
+    const defaultEnd = new Date(defaultStart);
+    defaultEnd.setDate(defaultStart.getDate() + 6);
+
+    const startDate = startInput || defaultStart;
+    const endDate = endInput || defaultEnd;
+
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    const startStr = toDateString(startDate);
+    const endStr = toDateString(endDate);
+
+    const rosterYear = startDate.getFullYear();
+    const rosterMonth = startDate.getMonth() + 1;
+    const monthStart = new Date(rosterYear, rosterMonth - 1, 1);
+    const monthEnd = new Date(rosterYear, rosterMonth, 0, 23, 59, 59, 999);
+
+    const [payrolls, clients, guards, rosterEntries, monthlyTargets] = await Promise.all([
+      Payroll.find({})
+        .populate({ path: 'guardId', select: 'guardName associatedGuard' })
+        .sort({ clientName: 1, siteName: 1, guardName: 1 })
+        .lean(),
+      Client.find({}).select('name').lean(),
+      GuardMaster.find({ isActive: true }).select('guardName associatedGuard').lean(),
+      RosterEntry.find({ date: { $gte: monthStart, $lte: monthEnd } }).lean(),
+      RosterMonthlyTarget.find({ year: rosterYear, month: rosterMonth }).lean()
+    ]);
+
+    const clientMap = new Map(
+      clients.map(c => [String(c.name || '').toLowerCase(), c._id])
+    );
+
+    const payrollIdSet = new Set(payrolls.map(p => p._id.toString()));
+    const monthlyTargetMap = new Map(
+      monthlyTargets.map(target => [target.payrollId.toString(), target])
+    );
+
+    const entriesByPayroll = new Map();
+    let totalHoursRange = 0;
+    let confirmedShifts = 0;
+    let unconfirmedShifts = 0;
+
+    rosterEntries.forEach(entry => {
+      const payrollId = entry.payrollId.toString();
+      if (!payrollIdSet.has(payrollId)) {
+        return;
+      }
+
+      const primaryHours = entry.primary?.hours || 0;
+      const totalHours = entry.totalHours || 0;
+
+      if (!entriesByPayroll.has(payrollId)) {
+        entriesByPayroll.set(payrollId, {
+          byDate: {},
+          primaryHoursBeforeRange: 0,
+          primaryHoursMonth: 0
+        });
+      }
+
+      const bucket = entriesByPayroll.get(payrollId);
+      bucket.primaryHoursMonth += primaryHours;
+
+      if (entry.dateString < startStr) {
+        bucket.primaryHoursBeforeRange += primaryHours;
+      }
+
+      if (entry.dateString >= startStr && entry.dateString <= endStr) {
+        bucket.byDate[entry.dateString] = {
+          primary: entry.primary || {},
+          associated: entry.associated || [],
+          totalHours: totalHours,
+          notes: entry.notes || '',
+          status: entry.status || 'unconfirmed'
+        };
+        totalHoursRange += totalHours;
+        if (totalHours > 0) {
+          if (entry.status === 'confirmed') {
+            confirmedShifts += 1;
+          } else {
+            unconfirmedShifts += 1;
+          }
+        }
+      }
+    });
+
+    const dayCount = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const totalCells = payrolls.length * dayCount;
+    const unassignedShifts = Math.max(totalCells - (confirmedShifts + unconfirmedShifts), 0);
+
+    const rows = payrolls.map(payroll => {
+      const pid = payroll._id.toString();
+      const entryData = entriesByPayroll.get(pid) || {
+        byDate: {},
+        primaryHoursBeforeRange: 0,
+        primaryHoursMonth: 0
+      };
+
+      const clientId =
+        payroll.clientId ||
+        clientMap.get(String(payroll.clientName || '').toLowerCase()) ||
+        null;
+
+      const target = monthlyTargetMap.get(pid);
+      const associatedTargets = target?.associated || [];
+      const monthlyPrimary = target?.primaryHours || 0;
+      const monthlyAssociatedTotal = associatedTargets.reduce((sum, item) => sum + (item.hours || 0), 0);
+      const monthlyTotal = typeof target?.totalHours === 'number'
+        ? target.totalHours
+        : monthlyPrimary + monthlyAssociatedTotal;
+
+      return {
+        payrollId: pid,
+        sid: pid.slice(-4).toUpperCase(),
+        clientName: payroll.clientName || '',
+        clientId: clientId,
+        siteName: payroll.siteName || '',
+        guardName: payroll.guardName || '',
+        guardId: payroll.guardId?._id || payroll.guardId || null,
+        associatedGuardId: payroll.guardId?.associatedGuard || null,
+        totalHoursTarget: monthlyTotal || 0,
+        primaryTargetHours: monthlyPrimary || 0,
+        monthlyAssociatedTargets: associatedTargets,
+        primaryHoursBeforeRange: entryData.primaryHoursBeforeRange,
+        primaryHoursMonth: entryData.primaryHoursMonth,
+        rosterByDate: entryData.byDate
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        start: startStr,
+        end: endStr,
+        totalHours: totalHoursRange,
+        confirmedShifts,
+        unconfirmedShifts,
+        unassignedShifts,
+        guards: guards,
+        rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching roster data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching roster data',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/roster/assign - Create/update roster entry
+ */
+app.post('/api/roster/assign', async (req, res) => {
+  try {
+    const { payrollId, date, primaryHours, associated, notes, status } = req.body;
+
+    if (!payrollId || !date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: payrollId, date'
+      });
+    }
+
+    const payroll = await Payroll.findById(payrollId).populate('guardId', 'guardName');
+    if (!payroll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payroll record not found'
+      });
+    }
+
+    const dateObj = new Date(date);
+    if (Number.isNaN(dateObj.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date'
+      });
+    }
+
+    const dateString = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+
+    const primaryHoursValue = parseFloat(primaryHours) || 0;
+
+    const associatedAssignments = Array.isArray(associated)
+      ? associated
+          .map(item => ({
+            guardId: item.guardId || null,
+            guardName: item.guardName || '',
+            hours: parseFloat(item.hours) || 0
+          }))
+          .filter(item => item.hours > 0)
+      : [];
+
+    const totalHoursValue = primaryHoursValue + associatedAssignments.reduce((sum, item) => sum + (item.hours || 0), 0);
+
+    if (totalHoursValue <= 0) {
+      await RosterEntry.findOneAndDelete({ payrollId, dateString });
+      return res.json({
+        success: true,
+        message: 'Roster entry cleared',
+        data: null
+      });
+    }
+
+    const updateData = {
+      payrollId: payrollId,
+      status: status === 'confirmed' ? 'confirmed' : 'unconfirmed',
+      date: dateObj,
+      dateString: dateString,
+      year: dateObj.getFullYear(),
+      month: dateObj.getMonth() + 1,
+      primary: {
+        guardId: payroll.guardId?._id || payroll.guardId || null,
+        guardName: payroll.guardName || '',
+        hours: primaryHoursValue
+      },
+      associated: associatedAssignments,
+      totalHours: totalHoursValue,
+      notes: notes || ''
+    };
+
+    const entry = await RosterEntry.findOneAndUpdate(
+      { payrollId, dateString },
+      updateData,
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Roster entry saved',
+      data: entry
+    });
+  } catch (error) {
+    console.error('Error saving roster entry:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error saving roster entry',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/roster/delete - Delete roster entry
+ */
+app.post('/api/roster/delete', async (req, res) => {
+  try {
+    const { payrollId, date } = req.body;
+
+    if (!payrollId || !date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: payrollId, date'
+      });
+    }
+
+    const deleted = await RosterEntry.findOneAndDelete({
+      payrollId,
+      dateString: date
+    });
+
+    res.json({
+      success: true,
+      message: deleted ? 'Roster entry deleted' : 'Roster entry not found'
+    });
+  } catch (error) {
+    console.error('Error deleting roster entry:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting roster entry',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/roster/monthly-target - Create/update monthly roster target
+ */
+app.post('/api/roster/monthly-target', async (req, res) => {
+  try {
+    const { payrollId, year, month, primaryHours, associated, notes } = req.body;
+
+    if (!payrollId || !year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: payrollId, year, month'
+      });
+    }
+
+    const primaryHoursValue = parseFloat(primaryHours) || 0;
+    const associatedAssignments = Array.isArray(associated)
+      ? associated
+          .map(item => ({
+            guardId: item.guardId || null,
+            guardName: item.guardName || '',
+            hours: parseFloat(item.hours) || 0
+          }))
+          .filter(item => item.hours > 0)
+      : [];
+
+    const totalHoursValue = primaryHoursValue + associatedAssignments.reduce((sum, item) => sum + (item.hours || 0), 0);
+
+    if (totalHoursValue <= 0) {
+      await RosterMonthlyTarget.findOneAndDelete({ payrollId, year, month });
+      return res.json({
+        success: true,
+        message: 'Monthly target cleared'
+      });
+    }
+
+    const target = await RosterMonthlyTarget.findOneAndUpdate(
+      { payrollId, year, month },
+      {
+        payrollId,
+        year,
+        month,
+        primaryHours: primaryHoursValue,
+        associated: associatedAssignments,
+        totalHours: totalHoursValue,
+        notes: notes || ''
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Monthly target saved',
+      data: target
+    });
+  } catch (error) {
+    console.error('Error saving monthly target:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error saving monthly target',
       error: error.message
     });
   }
@@ -2164,6 +3045,78 @@ app.use((err, req, res, next) => {
     message: 'Server error',
     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
+});
+
+// ==================== MAINTENANCE ROUTES ====================
+
+/**
+ * GET /api/maintenance/monthly-hours-count - Check monthly hours data count
+ */
+app.get('/api/maintenance/monthly-hours-count', async (req, res) => {
+  try {
+    const total = await MonthlyHours.countDocuments();
+    const lastAdded = await MonthlyHours.findOne({}).sort({ createdAt: -1 }).lean();
+    const last30Days = await MonthlyHours.countDocuments({
+      createdAt: {
+        $gte: new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalMonthlyHours: total,
+        hoursInLast30Days: last30Days,
+        lastAdded: lastAdded,
+        sampleRecords: await MonthlyHours.find({})
+          .limit(5)
+          .populate('guardId', 'guardName')
+          .sort({ createdAt: -1 })
+          .lean()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error checking monthly hours data',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/maintenance/fix-insurance-index - Fix the insuranceNumber index
+ */
+app.post('/api/maintenance/fix-insurance-index', async (req, res) => {
+  try {
+    const collection = mongoose.connection.collection('payrolls');
+    
+    // Drop the old index if it exists
+    try {
+      await collection.dropIndex('insuranceNumber_1');
+      console.log('✅ Old insuranceNumber index dropped');
+    } catch (dropErr) {
+      if (!dropErr.message.includes('index not found')) {
+        console.error('⚠️ Error dropping index:', dropErr.message);
+      }
+    }
+    
+    // Recreate with sparse option
+    await collection.createIndex({ insuranceNumber: 1 }, { unique: true, sparse: true });
+    console.log('✅ Sparse unique index created');
+    
+    res.json({
+      success: true,
+      message: 'Insurance number index fixed successfully. The index now allows multiple empty values.'
+    });
+  } catch (error) {
+    console.error('Error fixing index:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing index',
+      error: error.message
+    });
+  }
 });
 
 // ==================== SERVER STARTUP ====================

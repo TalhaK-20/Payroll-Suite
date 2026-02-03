@@ -7,80 +7,6 @@
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/png" href="/images/salary.png">
   <style>
-    /* Global Header Styles */
-    header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-    }
-
-    header .container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    header .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      color: white;
-    }
-
-    header .header-brand img {
-      width: 40px;
-      height: 40px;
-    }
-
-    header .header-brand h1 {
-      margin: 0;
-      font-size: 1.6rem;
-      font-weight: 700;
-    }
-
-    header nav ul {
-      list-style: none;
-      display: flex;
-      gap: 2rem;
-      margin: 0;
-      padding: 0;
-    }
-
-    header nav a {
-      color: rgba(255, 255, 255, 0.9);
-      text-decoration: none;
-      font-weight: 500;
-      padding: 0.5rem 1rem;
-      border-radius: 5px;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    header nav a:hover {
-      color: white;
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    header nav a::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: white;
-      transition: width 0.3s ease;
-    }
-
-    header nav a:hover::after {
-      width: 100%;
-    }
-
     .guards-container {
       max-width: 1400px;
       margin: 0 auto;
@@ -490,6 +416,7 @@
           <li><a href="/clients">🏢 Clients</a></li>
           <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
           <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/roster">Roster</a></li>
           <li><a href="/upload">📤 Upload</a></li>
         </ul>
       </nav>
@@ -710,6 +637,11 @@
       // Search and filter
       document.getElementById('searchInput').addEventListener('input', loadGuards);
       document.getElementById('statusFilter').addEventListener('change', loadGuards);
+
+      const editId = new URLSearchParams(window.location.search).get('editId');
+      if (editId) {
+        editGuard(editId);
+      }
     });
 
     async function loadGuards() {

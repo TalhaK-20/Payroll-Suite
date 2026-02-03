@@ -85,7 +85,8 @@ const payrollSchema = new mongoose.Schema({
   insuranceNumber: {
     type: String,
     trim: true,
-    default: ''
+    default: null,
+    sparse: true
   },
 
   // Immigration/Visa Information

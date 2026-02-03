@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roster - Payroll System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/png" href="/images/salary.png">
+  <style>
+    .roster-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .roster-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: #ffffff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      margin-bottom: 16px;
+    }
+
+    .roster-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      color: #0f766e;
+      font-size: 1.2rem;
+    }
+
+    .roster-stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .roster-chip {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .chip-confirmed { background: #16a34a; }
+    .chip-unconfirmed { background: #dc2626; }
+    .chip-unassigned { background: #1d4ed8; }
+
+    .roster-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .roster-controls button {
+      border: none;
+      background: #0f766e;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .roster-summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      color: #0f766e;
+    }
+
+    .roster-range {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+
+    .roster-table-wrapper {
+      background: white;
+      border-radius: 10px;
+      overflow-x: auto;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .roster-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      min-width: 980px;
+    }
+
+    .roster-table thead th {
+      position: sticky;
+      top: 0;
+      background: #0f766e;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-weight: 600;
+      z-index: 1;
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .roster-table td {
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      border-right: 1px solid #f1f5f9;
+      vertical-align: top;
+      background: #fff;
+    }
+
+    .roster-link {
+      color: #0f766e;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .roster-link:hover {
+      text-decoration: underline;
+    }
+
+    .roster-cell {
+      min-height: 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .shift-box {
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: white;
+      background: #64748b;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.78rem;
+    }
+
+    .shift-box.primary {
+      background: #0f766e;
+    }
+
+    .shift-box.primary.complete {
+      background: #16a34a;
+    }
+
+    .shift-box.associated {
+      background: #0ea5e9;
+    }
+
+    .shift-hours {
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    .shift-empty {
+      border: 1px dashed #cbd5f5;
+      color: #64748b;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 0.8rem;
+      background: #f8fafc;
+    }
+
+    .shift-action {
+      margin-top: 4px;
+      border: none;
+      background: #e2e8f0;
+      color: #0f766e;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .mode-toggle {
+      display: inline-flex;
+      background: #e2e8f0;
+      border-radius: 999px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .mode-toggle button {
+      border: none;
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .mode-toggle button.active {
+      background: #0f766e;
+      color: #ffffff;
+      box-shadow: 0 6px 14px rgba(15, 118, 110, 0.25);
+    }
+
+    .roster-controls .btn-outline {
+      background: #ffffff;
+      color: #0f766e;
+      border: 1px solid #0f766e;
+    }
+
+    .status-toggle {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .status-toggle button {
+      border: 1px solid #cbd5f5;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .status-toggle button.active {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #ffffff;
+    }
+
+    .modal-actions .btn-danger {
+      background: #ef4444;
+      color: #ffffff;
+      border: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .modal-close-btn {
+      border: none;
+      background: transparent;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .form-row.full {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row label {
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .form-row input,
+    .form-row select,
+    .form-row textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .assoc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .assoc-row {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .assoc-remove {
+      border: none;
+      background: #ef4444;
+      color: white;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      background: #0f766e;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      header nav ul {
+        gap: 0.8rem;
+        font-size: 0.85rem;
+      }
+
+      .roster-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-brand">
+        <img src="/images/salary.png" alt="Payroll Logo" class="logo">
+        <h1>💼 Payroll Pro</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="/">🏠 Home</a></li>
+          <li><a href="/guards">👥 Guards</a></li>
+          <li><a href="/clients">🏢 Clients</a></li>
+          <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
+          <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/roster">📅 Roster</a></li>
+          <li><a href="/upload">📤 Upload</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="roster-container">
+      <div class="roster-topbar">
+        <div class="roster-title">
+          Client Roster
+          <span class="roster-range" id="rosterRangeLabel">Roster Period: --</span>
+        </div>
+
+        <div class="roster-stats">
+          <span class="roster-chip chip-confirmed" id="confirmedCount">Confirmed Shifts: 0</span>
+          <span class="roster-chip chip-unconfirmed" id="unconfirmedCount">Unconfirmed Shifts: 0</span>
+          <span class="roster-chip chip-unassigned" id="unassignedCount">Unassigned Shifts: 0</span>
+        </div>
+
+        <div class="roster-controls">
+          <div class="mode-toggle" id="modeToggle">
+            <button id="dayModeBtn" class="active" type="button">Day View</button>
+            <button id="monthModeBtn" type="button">Monthly View</button>
+          </div>
+          <button id="prevWeekBtn">◀</button>
+          <button id="todayBtn">Today</button>
+          <button id="nextWeekBtn">▶</button>
+          <button id="reportBtn" class="btn-outline" type="button">Monthly Report</button>
+          <div class="roster-summary">
+            Total Hours: <span id="totalHoursValue">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="roster-table-wrapper">
+        <table class="roster-table">
+          <thead>
+            <tr id="rosterHeadRow">
+              <th>Client</th>
+              <th>SID</th>
+              <th>Site Name</th>
+              <th>Guard</th>
+              <!-- Day columns inserted via JS -->
+            </tr>
+          </thead>
+          <tbody id="rosterBody">
+            <tr><td colspan="11" style="text-align:center; padding: 20px;">Loading roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Roster Modal -->
+  <div id="rosterModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="rosterModalTitle">Assign Hours</h3>
+        <button class="modal-close-btn" id="closeRosterModal">✕</button>
+      </div>
+
+      <div class="status-toggle" id="statusToggle">
+        <button type="button" id="statusConfirmedBtn">Confirmed Shift</button>
+        <button type="button" id="statusUnconfirmedBtn">Unconfirmed Shift</button>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Client / Site / Guard</label>
+          <input type="text" id="rosterModalMeta" readonly style="background: #f8fafc;">
+        </div>
+      </div>
+
+      <div class="form-row day-fields">
+        <div>
+          <label>Date</label>
+          <input type="date" id="rosterDate" readonly>
+        </div>
+        <div>
+          <label>Total Hours for Day</label>
+          <input type="number" id="totalHoursInput" min="0" step="0.5">
+        </div>
+      </div>
+
+      <div class="form-row day-fields">
+        <div>
+          <label>Primary Guard Hours</label>
+          <input type="number" id="primaryHoursInput" min="0" step="0.5">
+        </div>
+        <div>
+          <label>Primary Remaining (Month)</label>
+          <input type="text" id="primaryRemainingInput" readonly style="background: #f8fafc;">
+        </div>
+      </div>
+
+      <div class="form-row monthly-fields" style="display: none;">
+        <div>
+          <label>Roster Month</label>
+          <input type="text" id="rosterMonthLabel" readonly style="background: #f8fafc;">
+        </div>
+        <div>
+          <label>Total Monthly Hours</label>
+          <input type="number" id="monthlyTotalHoursInput" min="0" step="0.5">
+        </div>
+      </div>
+
+      <div class="form-row monthly-fields" style="display: none;">
+        <div>
+          <label>Primary Monthly Hours</label>
+          <input type="number" id="monthlyPrimaryHoursInput" min="0" step="0.5">
+        </div>
+        <div>
+          <label>Primary Remaining (Month)</label>
+          <input type="text" id="monthlyRemainingInput" readonly style="background: #f8fafc;">
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Associated Guards</label>
+          <div class="assoc-list" id="assocList"></div>
+          <button class="btn-secondary" type="button" id="addAssocBtn">+ Add Associated Guard</button>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Notes (optional)</label>
+          <textarea id="rosterNotes" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-danger" type="button" id="deleteRosterBtn" style="display: none;">Delete</button>
+        <button class="btn-secondary" type="button" id="cancelRosterBtn">Cancel</button>
+        <button class="btn-primary" type="button" id="saveRosterBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/roster.js"></script>
+</body>
+</html>

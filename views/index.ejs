@@ -7,80 +7,6 @@
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/png" href="/images/salary.png">
   <style>
-    /* Global Header Styles */
-    header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-    }
-
-    header .container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-    }
-
-    header .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      color: white;
-    }
-
-    header .header-brand img {
-      width: 50px;
-      height: 50px;
-      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
-    }
-
-    header .header-brand h1 {
-      margin: 0;
-      font-size: 1.8rem;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-
-    header nav ul {
-      display: flex;
-      list-style: none;
-      gap: 2rem;
-      margin: 0;
-      padding: 0;
-    }
-
-    header nav a {
-      color: rgba(255, 255, 255, 0.9);
-      text-decoration: none;
-      font-weight: 500;
-      padding: 0.5rem 1rem;
-      border-radius: 5px;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    header nav a:hover {
-      color: white;
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    header nav a::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: white;
-      transition: width 0.3s ease;
-    }
-
-    header nav a:hover::after {
-      width: 100%;
-    }
-
     /* Home Hero Section */
     .hero-section {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -510,6 +436,7 @@
           <li><a href="/clients">🏢 Clients</a></li>
           <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
           <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/roster">Roster</a></li>
           <li><a href="/upload">📤 Upload</a></li>
         </ul>
       </nav>
@@ -608,6 +535,10 @@
             <div>
               <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Nationality</label>
               <input type="text" id="filterNationality" placeholder="Search nationality..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; color: #555;">Client Name</label>
+              <input type="text" id="filterClient" placeholder="Search client name..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
             </div>
           </div>
           <div style="margin-top: 15px; display: flex; gap: 10px;">
@@ -1163,7 +1094,7 @@
 
             tbody.innerHTML = records.map(record => {
               const date = new Date(record.createdAt).toLocaleDateString();
-              const associatedGuardName = record.hoursDistribution?.associatedGuardName || '-';
+              const associatedGuardName = record.hoursDistribution?.associatedGuardId?.guardName || '-';
               const associatedGuardHours = record.hoursDistribution?.associatedGuardHours || 0;
               const primaryGuardHours = record.hoursDistribution?.primaryGuardHours || 0;
               const totalHoursDecimal = record.totalHours + (record.totalMinutes / 60);
@@ -1788,7 +1719,7 @@
             const remainingHours = totalHoursDecimal - hoursSpent;
             
             const totalPay = totalHoursDecimal * (item.payRate || 0);
-            const associatedGuardName = item.hoursDistribution?.associatedGuardName || '-';
+            const associatedGuardName = item.hoursDistribution?.associatedGuardId?.guardName || '-';
             const associatedGuardHours = (item.hoursDistribution?.associatedGuardHours || 0).toFixed(2);
             
             // Color coding for rows based on status
@@ -1837,12 +1768,14 @@
       const insuranceNumber = document.getElementById('filterInsurance')?.value || '';
       const visaStatus = document.getElementById('filterVisa')?.value || '';
       const nationality = document.getElementById('filterNationality')?.value || '';
+      const clientName = document.getElementById('filterClient')?.value || '';
 
       const params = new URLSearchParams();
       if (guardName) params.append('guardName', guardName);
       if (insuranceNumber) params.append('insuranceNumber', insuranceNumber);
       if (visaStatus) params.append('visaStatus', visaStatus);
       if (nationality) params.append('nationality', nationality);
+      if (clientName) params.append('clientName', clientName);
 
       try {
         const response = await fetch(`/api/payroll/filter?${params}`);
@@ -1865,7 +1798,7 @@
             const remainingHours = totalHoursDecimal - hoursSpent;
             
             const totalPay = totalHoursDecimal * (item.payRate || 0);
-            const associatedGuardName = item.hoursDistribution?.associatedGuardName || '-';
+            const associatedGuardName = item.hoursDistribution?.associatedGuardId?.guardName || '-';
             const associatedGuardHours = (item.hoursDistribution?.associatedGuardHours || 0).toFixed(2);
             
             // Color coding for rows based on status
@@ -1914,6 +1847,7 @@
       document.getElementById('filterInsurance').value = '';
       document.getElementById('filterVisa').value = '';
       document.getElementById('filterNationality').value = '';
+      document.getElementById('filterClient').value = '';
       loadPayrollRecords();
     }
 

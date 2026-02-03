@@ -6,80 +6,8 @@
   <title>Monthly Hours - Payroll System</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/png" href="/images/salary.png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <style>
-    /* Global Header */
-    header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-    }
-
-    header .container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    header .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      color: white;
-    }
-
-    header .header-brand img {
-      width: 40px;
-      height: 40px;
-    }
-
-    header .header-brand h1 {
-      margin: 0;
-      font-size: 1.6rem;
-      font-weight: 700;
-    }
-
-    header nav ul {
-      list-style: none;
-      display: flex;
-      gap: 2rem;
-      margin: 0;
-      padding: 0;
-    }
-
-    header nav a {
-      color: rgba(255, 255, 255, 0.9);
-      text-decoration: none;
-      font-weight: 500;
-      padding: 0.5rem 1rem;
-      border-radius: 5px;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    header nav a:hover {
-      color: white;
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    header nav a::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: white;
-      transition: width 0.3s ease;
-    }
-
-    header nav a:hover::after {
-      width: 100%;
-    }
     .monthly-hours-container {
       max-width: 1200px;
       margin: 0 auto;
@@ -359,6 +287,37 @@
       color: #999;
     }
 
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .graphs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .graph-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #eee;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      position: relative;
+      min-height: 350px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .graph-container canvas {
+      flex: 1;
+      max-height: 300px;
+    }
+
     .summary-section {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -398,6 +357,18 @@
 
     .summary-value {
       font-weight: 600;
+      color: #333;
+    }
+
+    @media (max-width: 768px) {
+      .graphs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+    }
       color: #333;
     }
 
@@ -451,6 +422,7 @@
           <li><a href="/clients">🏢 Clients</a></li>
           <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
           <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/roster">Roster</a></li>
           <li><a href="/upload">📤 Upload</a></li>
         </ul>
       </nav>
@@ -460,97 +432,134 @@
   <div class="monthly-hours-container">
     <!-- Header -->
     <div class="monthly-header">
-      <h1>Monthly Hours Entry</h1>
-      <div class="month-selector">
-        <label for="monthInput" style="margin: 0; font-weight: 600;">Select Month:</label>
-        <input type="month" id="monthInput">
-        <button onclick="loadMonthlyData()">Load</button>
-      </div>
+      <h1>📊 Monthly Hours Analysis & Audit</h1>
     </div>
 
-    <!-- Entry Form -->
+    <!-- Advanced Filters Section -->
     <div class="content-section">
-      <div class="section-title">Add Monthly Hours for Guard</div>
+      <div class="section-title">Analysis Filters</div>
       
-      <div class="guard-entry-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Select Guard *</label>
-            <select id="guardSelect" required>
-              <option value="">-- Select a Guard --</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Total Hours *</label>
-            <input type="number" id="totalHours" min="0" max="744" step="1" placeholder="Hours" required>
-          </div>
-
-          <div class="form-group">
-            <label>Minutes</label>
-            <input type="number" id="totalMinutes" min="0" max="59" step="1" placeholder="Minutes" value="0">
-          </div>
-
-          <div class="form-group">
-            <label>&nbsp;</label>
-            <button type="button" class="btn-add-hours" onclick="addMonthlyHours()">Add Hours</button>
-          </div>
+      <div class="filters-grid">
+        <div class="form-group">
+          <label>Guard</label>
+          <select id="guardFilter" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; width: 100%;">
+            <option value="">All Guards</option>
+          </select>
         </div>
 
         <div class="form-group">
-          <label>Notes (Optional)</label>
-          <textarea id="notes" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; min-height: 60px;"></textarea>
+          <label>Client</label>
+          <select id="clientFilter" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; width: 100%;">
+            <option value="">All Clients</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Status</label>
+          <select id="statusFilter" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; width: 100%;">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="partial">Partially Paid</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-add-hours" onclick="applyFilters()" style="width: 100%;">Apply Filters</button>
+        </div>
+
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-add-hours" onclick="clearFilters()" style="width: 100%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Clear Filters</button>
         </div>
       </div>
     </div>
 
     <!-- Monthly Hours List -->
     <div class="content-section">
-      <div class="section-title">Hours for <span id="monthDisplay">Current Month</span></div>
+      <div class="section-title">Audit Trail - Hours Entries</div>
       <div id="hoursListContainer">
         <div class="empty-state">
-          <p>Select a month to view hours entries.</p>
+          <p>No data to display. Apply filters to view hours entries.</p>
         </div>
       </div>
     </div>
 
-    <!-- Monthly Summary -->
+    <!-- Analysis Graphs Section -->
     <div class="content-section">
-      <div class="section-title">Monthly Summary</div>
+      <div class="section-title">Hours Distribution Analysis</div>
+      
+      <div class="graphs-grid">
+        <div class="graph-container">
+          <h3 style="text-align: center; color: #333; margin-top: 0;">Hours by Guard</h3>
+          <canvas id="hoursBarChart"></canvas>
+        </div>
+
+        <div class="graph-container">
+          <h3 style="text-align: center; color: #333; margin-top: 0;">Hours Status Breakdown</h3>
+          <canvas id="statusPieChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-section">
+      <div class="section-title">Pay Analysis</div>
+      
+      <div class="graphs-grid">
+        <div class="graph-container">
+          <h3 style="text-align: center; color: #333; margin-top: 0;">Hours Trend Over Time</h3>
+          <canvas id="hoursTrendChart"></canvas>
+        </div>
+
+        <div class="graph-container">
+          <h3 style="text-align: center; color: #333; margin-top: 0;">Pay Distribution by Guard</h3>
+          <canvas id="payDistributionChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="content-section">
+      <div class="section-title">Summary Statistics</div>
       <div class="summary-section" id="summarySection">
         <div class="summary-card">
-          <div class="summary-card-title">Total Hours Entered</div>
+          <div class="summary-card-title">Total Hours</div>
           <div class="summary-row">
-            <span class="summary-label">Hours:</span>
-            <span class="summary-value" id="totalEnteredHours">0</span>
+            <span class="summary-label">Entered:</span>
+            <span class="summary-value" id="totalEnteredHours">0</span> h
           </div>
           <div class="summary-row">
-            <span class="summary-label">Minutes:</span>
-            <span class="summary-value" id="totalEnteredMinutes">0</span>
-          </div>
-        </div>
-
-        <div class="summary-card">
-          <div class="summary-card-title">Hours Paid</div>
-          <div class="summary-row">
-            <span class="summary-label">Hours:</span>
-            <span class="summary-value" id="totalPaidHours">0</span>
+            <span class="summary-label">Paid:</span>
+            <span class="summary-value" id="totalPaidHours">0</span> h
           </div>
           <div class="summary-row">
-            <span class="summary-label">Minutes:</span>
-            <span class="summary-value" id="totalPaidMinutes">0</span>
+            <span class="summary-label">Remaining:</span>
+            <span class="summary-value" id="totalRemainingHours">0</span> h
           </div>
         </div>
 
         <div class="summary-card">
-          <div class="summary-card-title">Remaining Hours</div>
+          <div class="summary-card-title">Guard Count</div>
           <div class="summary-row">
-            <span class="summary-label">Hours:</span>
-            <span class="summary-value" id="totalRemainingHours">0</span>
+            <span class="summary-label">Total Guards:</span>
+            <span class="summary-value" id="totalGuards">0</span>
           </div>
           <div class="summary-row">
-            <span class="summary-label">Minutes:</span>
-            <span class="summary-value" id="totalRemainingMinutes">0</span>
+            <span class="summary-label">With Hours:</span>
+            <span class="summary-value" id="guardsWithHours">0</span>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-title">Average Hours</div>
+          <div class="summary-row">
+            <span class="summary-label">Per Guard:</span>
+            <span class="summary-value" id="avgHoursPerGuard">0</span> h
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Paid Ratio:</span>
+            <span class="summary-value" id="paidRatio">0</span>%
           </div>
         </div>
       </div>
@@ -558,20 +567,32 @@
   </div>
 
   <script>
-    let currentMonth = new Date();
     let guardsData = [];
+    let clientsData = [];
+    let chartsInstances = {};
+    let currentFilters = {
+      guardId: null,
+      clientId: null,
+      status: null
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Set current month in input
-      const today = new Date();
-      const monthStr = today.toISOString().slice(0, 7);
-      document.getElementById('monthInput').value = monthStr;
-      document.getElementById('monthInput').addEventListener('change', loadMonthlyData);
-
-      // Load guards
-      loadGuards();
-      loadMonthlyData();
+      initializePage();
     });
+
+    async function initializePage() {
+      try {
+        // Load guards and clients
+        await loadGuards();
+        await loadClients();
+        
+        // Apply initial filters
+        applyFilters();
+      } catch (error) {
+        console.error('Error initializing page:', error);
+        showToast('Error initializing page', 'error');
+      }
+    }
 
     async function loadGuards() {
       try {
@@ -580,180 +601,383 @@
 
         if (result.success) {
           guardsData = result.data;
-          const select = document.getElementById('guardSelect');
-          select.innerHTML = '<option value="">-- Select a Guard --</option>' +
-            result.data.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
+          const select = document.getElementById('guardFilter');
+          select.innerHTML = '<option value="">All Guards</option>' +
+            guardsData.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
         }
       } catch (error) {
         console.error('Error loading guards:', error);
       }
     }
 
-    async function loadMonthlyData() {
+    async function loadClients() {
       try {
-        const monthInput = document.getElementById('monthInput').value;
-        if (!monthInput) return;
-
-        const [year, month] = monthInput.split('-');
-        currentMonth = new Date(year, parseInt(month) - 1);
-
-        // Format month display
-        const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        document.getElementById('monthDisplay').textContent = monthName;
-
-        const response = await fetch(`/api/monthly-hours?year=${year}&month=${month}`);
+        const response = await fetch('/api/clients');
         const result = await response.json();
 
         if (result.success) {
-          displayMonthlyHours(result.data);
-          calculateSummary(result.data);
+          clientsData = result.data || [];
+          const select = document.getElementById('clientFilter');
+          select.innerHTML = '<option value="">All Clients</option>' +
+            clientsData.map(c => `<option value="${c._id}">${c.clientName}</option>`).join('');
         }
       } catch (error) {
-        console.error('Error loading monthly data:', error);
-        showToast('Error loading monthly data', 'error');
+        console.error('Error loading clients:', error);
       }
     }
 
-    function displayMonthlyHours(hours) {
+    async function applyFilters() {
+      try {
+        currentFilters = {
+          guardId: document.getElementById('guardFilter').value,
+          clientId: document.getElementById('clientFilter').value,
+          status: document.getElementById('statusFilter').value
+        };
+
+        console.log('🔍 Applying filters:', currentFilters);
+
+        // Fetch analysis data
+        const queryParams = new URLSearchParams();
+        if (currentFilters.guardId) queryParams.append('guardId', currentFilters.guardId);
+        if (currentFilters.clientId) queryParams.append('clientId', currentFilters.clientId);
+        if (currentFilters.status) queryParams.append('status', currentFilters.status);
+
+        const url = `/api/monthly-hours/analysis?${queryParams.toString()}`;
+        console.log('📡 Fetching from:', url);
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        console.log('📥 API Response:', result);
+
+        if (result.success) {
+          console.log('✅ Data received successfully:', result.data);
+          displayAuditTrail(result.data.entries);
+          updateSummaryStatistics(result.data);
+          generateGraphs(result.data);
+        } else {
+          console.error('❌ API error:', result.message);
+          showToast('Error loading analysis data: ' + result.message, 'error');
+        }
+      } catch (error) {
+        console.error('❌ Error applying filters:', error);
+        showToast('Error applying filters: ' + error.message, 'error');
+      }
+    }
+
+    async function clearFilters() {
+      document.getElementById('guardFilter').value = '';
+      document.getElementById('clientFilter').value = '';
+      document.getElementById('statusFilter').value = '';
+
+      applyFilters();
+    }
+
+    function displayAuditTrail(entries) {
       const container = document.getElementById('hoursListContainer');
 
-      if (hours.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No hours entered for this month yet.</p></div>';
+      if (!entries || entries.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No hours entries found for the selected filters.</p></div>';
         return;
       }
 
-      container.innerHTML = hours.map(h => {
-        const guard = guardsData.find(g => g._id === h.guardId);
-        const guardName = guard ? guard.guardName : 'Unknown Guard';
-        const totalHours = h.totalHours + (h.totalMinutes / 60);
-        const remaining = h.remainingHours + (h.remainingMinutes / 60);
-
+      container.innerHTML = entries.map(entry => {
+        // Guard name comes directly from populated data
+        const guardName = entry.guardId?.guardName || 'Unknown Guard';
+        const createdDate = new Date(entry.createdAt).toLocaleDateString();
+        const status = entry.status || 'pending';
+        const statusColor = status === 'paid' ? '#4caf50' : status === 'partial' ? '#ff9800' : '#f44336';
+        
         return `
-          <div class="hours-row">
+          <div class="hours-row" style="border-left: 4px solid ${statusColor};">
             <div class="hours-info">
               <div class="hours-info-title">${guardName}</div>
               <div class="hours-info-details">
-                Entered: ${h.totalHours}h ${h.totalMinutes}m | 
-                Paid: ${h.paidHours}h ${h.paidMinutes}m | 
-                Remaining: ${h.remainingHours}h ${h.remainingMinutes}m
+                <strong>Entered:</strong> ${entry.totalHours}h ${entry.totalMinutes}m | 
+                <strong>Paid:</strong> ${entry.paidHours}h ${entry.paidMinutes}m | 
+                <strong>Remaining:</strong> ${entry.remainingHours}h ${entry.remainingMinutes}m
               </div>
-              ${h.notes ? `<div class="hours-info-details" style="margin-top: 5px; color: #999;">${h.notes}</div>` : ''}
-            </div>
-            <div class="action-buttons">
-              <button class="btn-icon btn-edit" onclick="editMonthlyHours('${h._id}')">Edit</button>
-              <button class="btn-icon btn-delete" onclick="deleteMonthlyHours('${h._id}')">Delete</button>
+              <div class="hours-info-details" style="margin-top: 5px; color: #999; font-size: 12px;">
+                📅 ${createdDate} | Status: <span style="color: ${statusColor}; font-weight: 600;">${status.toUpperCase()}</span>
+              </div>
+              ${entry.notes ? `<div class="hours-info-details" style="margin-top: 5px; color: #999; font-style: italic;">📝 ${entry.notes}</div>` : ''}
             </div>
           </div>
         `;
       }).join('');
     }
 
-    function calculateSummary(hours) {
-      let totalHours = 0, totalMinutes = 0;
-      let paidHours = 0, paidMinutes = 0;
-      let remainingHours = 0, remainingMinutes = 0;
+    function updateSummaryStatistics(data) {
+      const { summary, entries } = data;
+      
+      console.log('📊 Summary Data:', summary);
+      console.log('📋 Entries Count:', entries?.length || 0);
+      
+      if (!summary) {
+        console.warn('⚠️ No summary data received from API');
+        document.getElementById('totalEnteredHours').textContent = '0';
+        document.getElementById('totalPaidHours').textContent = '0';
+        document.getElementById('totalRemainingHours').textContent = '0';
+        document.getElementById('totalGuards').textContent = '0';
+        document.getElementById('guardsWithHours').textContent = '0';
+        document.getElementById('avgHoursPerGuard').textContent = '0';
+        document.getElementById('paidRatio').textContent = '0';
+        return;
+      }
 
-      hours.forEach(h => {
-        totalHours += h.totalHours;
-        totalMinutes += h.totalMinutes;
-        paidHours += h.paidHours;
-        paidMinutes += h.paidMinutes;
-        remainingHours += h.remainingHours;
-        remainingMinutes += h.remainingMinutes;
+      const totalEntered = summary.totalHours || 0;
+      const totalPaid = summary.paidHours || 0;
+      const totalRemaining = summary.remainingHours || 0;
+      const totalGuardsFromSummary = summary.totalGuards || entries?.length || 0;
+      const avgHours = summary.averageHoursPerGuard || (totalGuardsFromSummary > 0 ? (totalEntered / totalGuardsFromSummary).toFixed(1) : 0);
+      const paidRatio = totalEntered > 0 ? ((totalPaid / totalEntered) * 100).toFixed(1) : 0;
+
+      console.log('✅ Updating display with:', { totalEntered, totalPaid, totalRemaining, totalGuardsFromSummary, avgHours, paidRatio });
+
+      document.getElementById('totalEnteredHours').textContent = totalEntered;
+      document.getElementById('totalPaidHours').textContent = totalPaid;
+      document.getElementById('totalRemainingHours').textContent = totalRemaining;
+      document.getElementById('totalGuards').textContent = totalGuardsFromSummary;
+      document.getElementById('guardsWithHours').textContent = entries?.length || 0;
+      document.getElementById('avgHoursPerGuard').textContent = avgHours;
+      document.getElementById('paidRatio').textContent = paidRatio;
+    }
+
+    function generateGraphs(data) {
+      const { entries, summary } = data;
+
+      if (!entries || entries.length === 0) {
+        // Clear all charts if no data
+        Object.keys(chartsInstances).forEach(key => {
+          if (chartsInstances[key]) chartsInstances[key].destroy();
+        });
+        chartsInstances = {};
+        return;
+      }
+
+      // Process data for graphs
+      const hoursbyGuard = processHoursByGuard(entries);
+      const statusBreakdown = processStatusBreakdown(entries);
+      const trendData = processTrendData(entries);
+      const payDistribution = processPayDistribution(entries);
+
+      // Generate charts
+      generateHoursBarChart(hoursbyGuard);
+      generateStatusPieChart(statusBreakdown);
+      generateHoursTrendChart(trendData);
+      generatePayDistributionChart(payDistribution);
+    }
+
+    function processHoursByGuard(entries) {
+      const guardMap = {};
+      
+      entries.forEach(entry => {
+        // Guard name comes directly from populated guardId object
+        const guardName = entry.guardId?.guardName || 'Unknown Guard';
+        
+        if (!guardMap[guardName]) {
+          guardMap[guardName] = { hours: 0, minutes: 0 };
+        }
+        
+        guardMap[guardName].hours += entry.totalHours;
+        guardMap[guardName].minutes += entry.totalMinutes;
       });
 
       // Normalize minutes
-      totalHours += Math.floor(totalMinutes / 60);
-      totalMinutes = totalMinutes % 60;
+      Object.keys(guardMap).forEach(key => {
+        const hours = guardMap[key].hours + Math.floor(guardMap[key].minutes / 60);
+        const minutes = guardMap[key].minutes % 60;
+        guardMap[key].total = parseFloat((hours + minutes / 60).toFixed(2));
+      });
 
-      paidHours += Math.floor(paidMinutes / 60);
-      paidMinutes = paidMinutes % 60;
-
-      remainingHours += Math.floor(remainingMinutes / 60);
-      remainingMinutes = remainingMinutes % 60;
-
-      document.getElementById('totalEnteredHours').textContent = totalHours;
-      document.getElementById('totalEnteredMinutes').textContent = totalMinutes;
-      document.getElementById('totalPaidHours').textContent = paidHours;
-      document.getElementById('totalPaidMinutes').textContent = paidMinutes;
-      document.getElementById('totalRemainingHours').textContent = remainingHours;
-      document.getElementById('totalRemainingMinutes').textContent = remainingMinutes;
+      return guardMap;
     }
 
-    async function addMonthlyHours() {
-      const guardId = document.getElementById('guardSelect').value;
-      const totalHours = parseInt(document.getElementById('totalHours').value);
-      const totalMinutes = parseInt(document.getElementById('totalMinutes').value) || 0;
-      const notes = document.getElementById('notes').value;
-      const monthInput = document.getElementById('monthInput').value;
-
-      if (!guardId) {
-        showToast('Please select a guard', 'error');
-        return;
-      }
-
-      if (!monthInput) {
-        showToast('Please select a month', 'error');
-        return;
-      }
-
-      if (isNaN(totalHours) || totalHours < 0) {
-        showToast('Please enter valid hours', 'error');
-        return;
-      }
-
-      try {
-        const [year, month] = monthInput.split('-');
-        const response = await fetch('/api/monthly-hours', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guardId,
-            year: parseInt(year),
-            month: parseInt(month),
-            totalHours,
-            totalMinutes,
-            notes
-          })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          showToast('Hours added successfully', 'success');
-          document.getElementById('totalHours').value = '';
-          document.getElementById('totalMinutes').value = '0';
-          document.getElementById('notes').value = '';
-          document.getElementById('guardSelect').value = '';
-          loadMonthlyData();
+    function processStatusBreakdown(entries) {
+      const statusMap = { paid: 0, partial: 0, pending: 0 };
+      
+      entries.forEach(entry => {
+        if (entry.status) {
+          statusMap[entry.status] = (statusMap[entry.status] || 0) + 1;
         } else {
-          showToast(result.message || 'Error adding hours', 'error');
+          statusMap.pending++;
         }
-      } catch (error) {
-        console.error('Error adding hours:', error);
-        showToast('Error adding hours', 'error');
-      }
+      });
+
+      return statusMap;
     }
 
-    async function deleteMonthlyHours(id) {
-      if (!confirm('Are you sure you want to delete this entry?')) return;
-
-      try {
-        const response = await fetch(`/api/monthly-hours/${id}`, { method: 'DELETE' });
-        // Add DELETE endpoint to app.js
-        const result = await response.json();
-        if (result.success) {
-          showToast('Hours deleted successfully', 'success');
-          loadMonthlyData();
+    function processTrendData(entries) {
+      const trendMap = {};
+      
+      entries.forEach(entry => {
+        const date = new Date(entry.createdAt).toLocaleDateString();
+        if (!trendMap[date]) {
+          trendMap[date] = 0;
         }
-      } catch (error) {
-        console.error('Error deleting hours:', error);
-      }
+        trendMap[date] += entry.totalHours + (entry.totalMinutes / 60);
+      });
+
+      // Sort by date
+      const sortedDates = Object.keys(trendMap).sort((a, b) => new Date(a) - new Date(b));
+      return {
+        dates: sortedDates.slice(-14), // Last 14 days
+        values: sortedDates.slice(-14).map(d => parseFloat(trendMap[d].toFixed(2)))
+      };
     }
 
-    function editMonthlyHours(id) {
-      // Navigate to edit modal or inline edit
-      console.log('Edit monthly hours:', id);
+    function processPayDistribution(entries) {
+      const guardMap = {};
+      
+      entries.forEach(entry => {
+        // Guard name comes directly from populated guardId object
+        const guardName = entry.guardId?.guardName || 'Unknown Guard';
+        
+        if (!guardMap[guardName]) {
+          guardMap[guardName] = 0;
+        }
+        
+        guardMap[guardName] += entry.paidHours + (entry.paidMinutes / 60);
+      });
+
+      return guardMap;
+    }
+
+    function generateHoursBarChart(data) {
+      const ctx = document.getElementById('hoursBarChart').getContext('2d');
+      
+      if (chartsInstances.hoursBar) {
+        chartsInstances.hoursBar.destroy();
+      }
+
+      chartsInstances.hoursBar = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data),
+          datasets: [{
+            label: 'Total Hours',
+            data: Object.values(data).map(d => d.total),
+            backgroundColor: 'rgba(102, 126, 234, 0.8)',
+            borderColor: 'rgba(102, 126, 234, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function generateStatusPieChart(data) {
+      const ctx = document.getElementById('statusPieChart').getContext('2d');
+      
+      if (chartsInstances.statusPie) {
+        chartsInstances.statusPie.destroy();
+      }
+
+      const colors = ['#4caf50', '#ff9800', '#f44336'];
+      const labels = ['Paid', 'Partial', 'Pending'];
+      
+      chartsInstances.statusPie = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: [data.paid || 0, data.partial || 0, data.pending || 0],
+            backgroundColor: colors,
+            borderColor: '#fff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    }
+
+    function generateHoursTrendChart(data) {
+      const ctx = document.getElementById('hoursTrendChart').getContext('2d');
+      
+      if (chartsInstances.hoursTrend) {
+        chartsInstances.hoursTrend.destroy();
+      }
+
+      chartsInstances.hoursTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.dates,
+          datasets: [{
+            label: 'Hours Entered',
+            data: data.values,
+            borderColor: 'rgba(102, 126, 234, 1)',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: 'rgba(102, 126, 234, 1)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function generatePayDistributionChart(data) {
+      const ctx = document.getElementById('payDistributionChart').getContext('2d');
+      
+      if (chartsInstances.payDistribution) {
+        chartsInstances.payDistribution.destroy();
+      }
+
+      const colors = [
+        '#667eea', '#764ba2', '#f093fb', '#f5576c', 
+        '#4facfe', '#00f2fe', '#43e97b', '#fa7921'
+      ];
+
+      chartsInstances.payDistribution = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data),
+          datasets: [{
+            label: 'Hours Paid',
+            data: Object.values(data),
+            backgroundColor: colors.slice(0, Object.keys(data).length),
+            borderColor: colors.slice(0, Object.keys(data).length),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true }
+          }
+        }
+      });
     }
 
     function showToast(message, type = 'success') {

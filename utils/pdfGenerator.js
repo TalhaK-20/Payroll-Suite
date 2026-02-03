@@ -4,85 +4,45 @@ const path = require('path');
 
 class PayrollPDFGenerator {
   constructor() {
-    this.pageWidth = 595; // A4 width
-    this.pageHeight = 842; // A4 height
-    this.margin = 50;
+    this.pageWidth = 595; // A4 width in points
+    this.pageHeight = 842; // A4 height in points
+    this.margin = 40;
     this.primaryColor = '#1a365d';
     this.secondaryColor = '#2d5a8c';
     this.accentColor = '#27ae60';
+    this.dangerColor = '#dc3545';
     this.lightGray = '#f8f9fa';
-    this.borderColor = '#e0e0e0';
+    this.borderColor = '#dee2e6';
   }
 
+  /**
+   * Generate comprehensive payroll PDF with all guard information
+   */
   generatePayrollPDF(payrollData, payNumber, outputPath) {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
           size: 'A4',
-          margin: this.margin
+          margin: this.margin,
+          bufferPages: true
         });
 
-        // If outputPath is provided, use file stream; otherwise use buffer
         let buffers = [];
         
         if (outputPath) {
-          // For local file system (localhost)
           const stream = fs.createWriteStream(outputPath);
           doc.pipe(stream);
-          
-          // Professional Header
-          this.addProfessionalHeader(doc, payNumber);
-
-          // Employee Information
-          this.addProfessionalEmployeeInfo(doc, payrollData);
-
-          // Payment Details Table
-          this.addProfessionalPaymentDetails(doc, payrollData, payNumber);
-
-          // Bank Details Section
-          this.addBankDetailsSection(doc, payrollData);
-
-          // Professional Footer
-          this.addProfessionalFooter(doc);
-
+          this.buildPDFContent(doc, payrollData, payNumber);
           doc.end();
 
-          stream.on('finish', () => {
-            resolve(outputPath);
-          });
-
-          stream.on('error', (error) => {
-            reject(error);
-          });
+          stream.on('finish', () => resolve(outputPath));
+          stream.on('error', reject);
         } else {
-          // For serverless (Vercel) - return buffer
-          doc.on('data', (chunk) => {
-            buffers.push(chunk);
-          });
+          doc.on('data', chunk => buffers.push(chunk));
+          doc.on('end', () => resolve(Buffer.concat(buffers)));
+          doc.on('error', reject);
 
-          doc.on('end', () => {
-            resolve(Buffer.concat(buffers));
-          });
-
-          doc.on('error', (error) => {
-            reject(error);
-          });
-
-          // Professional Header
-          this.addProfessionalHeader(doc, payNumber);
-
-          // Employee Information
-          this.addProfessionalEmployeeInfo(doc, payrollData);
-
-          // Payment Details Table
-          this.addProfessionalPaymentDetails(doc, payrollData, payNumber);
-
-          // Bank Details Section
-          this.addBankDetailsSection(doc, payrollData);
-
-          // Professional Footer
-          this.addProfessionalFooter(doc);
-
+          this.buildPDFContent(doc, payrollData, payNumber);
           doc.end();
         }
       } catch (error) {
@@ -91,286 +51,447 @@ class PayrollPDFGenerator {
     });
   }
 
-  addProfessionalHeader(doc, payNumber) {
-    // Background gradient effect with rectangles
-    doc.rect(0, 0, this.pageWidth, 120)
+  /**
+   * Build the complete PDF content
+   */
+  buildPDFContent(doc, data, payNumber = 1) {
+    // Handle both array and object inputs
+    const record = Array.isArray(data) ? data[0] : data;
+    
+    if (!record) {
+      throw new Error('No payroll data provided for PDF generation');
+    }
+    
+    // Header
+    this.addHeader(doc, payNumber);
+
+    // Guard Information Section
+    this.addGuardInformation(doc, record);
+
+    // Working Hours & Rates Section
+    this.addWorkingHoursSection(doc, record);
+
+    // Bank Account(s) Section
+    this.addBankAccountsSection(doc, record);
+
+    // Payment Summary Section
+    this.addPaymentSummary(doc, record, payNumber);
+
+    // Footer
+    this.addFooter(doc);
+  }
+
+  /**
+   * Add professional header with company branding
+   */
+  addHeader(doc, payNumber = 1) {
+    // Background
+    doc.rect(this.margin - 40, this.margin - 40, this.pageWidth - 2 * (this.margin - 40), 80)
       .fill(this.primaryColor);
 
-    // Company branding
-    doc.fontSize(24)
-      .font('Helvetica-Bold')
+    // Title
+    doc.fontSize(28)
       .fillColor('#ffffff')
-      .text('PAYROLL DOCUMENT', this.margin, 30);
-
-    // Payroll type badge
-    const payNumberText = payNumber === 1 ? 'PAYROLL 01' : payNumber === 2 ? 'PAYROLL 02' : 'PAYROLL 03';
-    doc.fontSize(14)
       .font('Helvetica-Bold')
-      .fillColor(this.accentColor)
-      .text(payNumberText, this.margin, 60);
-
-    // Generation date
-    doc.fontSize(9)
+      .text('PAYROLL STATEMENT', this.margin, 50, { align: 'left' })
+      .fontSize(11)
       .font('Helvetica')
-      .fillColor('#cccccc')
-      .text(`Generated: ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date().toLocaleTimeString()}`, this.margin, 85);
+      .text('Security Guard Employment Record', this.margin, 80);
 
-    doc.moveDown(4);
+    // Date info on right
+    doc.fontSize(9)
+      .text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 
+        this.pageWidth - this.margin - 150, 50, { width: 150, align: 'right' });
+
+    doc.fillColor('#000000');
+    doc.y = 130;
   }
 
-  addProfessionalEmployeeInfo(doc, data) {
-    doc.fillColor('#000');
-    
-    // Section title with underline
-    doc.fontSize(11)
-      .font('Helvetica-Bold')
-      .text('EMPLOYEE INFORMATION', this.margin, doc.y);
+  /**
+   * Add guard basic information section
+   */
+  addGuardInformation(doc, data) {
+    this.addSectionTitle(doc, '👤 GUARD INFORMATION');
 
-    // Underline
-    doc.moveTo(this.margin, doc.y + 5)
-      .lineTo(this.pageWidth - this.margin, doc.y + 5)
-      .strokeColor(this.secondaryColor)
-      .stroke();
+    const infoBoxX = this.margin;
+    const infoBoxWidth = this.pageWidth - 2 * this.margin;
+    const infoBoxHeight = 100;
 
-    doc.moveDown(1.5);
+    // Background
+    doc.rect(infoBoxX, doc.y, infoBoxWidth, infoBoxHeight)
+      .fill(this.lightGray);
 
-    // Two column layout
-    const col1X = this.margin;
-    const col2X = this.margin + (this.pageWidth - 2 * this.margin) / 2;
-    const lineHeight = 20;
-
-    const currentY = doc.y;
+    const infoY = doc.y + 10;
+    doc.fontSize(10);
 
     // Left column
-    doc.fontSize(9)
-      .font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Guard Name:', infoBoxX + 10, infoY, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text(data.guardName || 'N/A', infoBoxX + 110, infoY - 10);
 
-    const leftCol = [
-      { label: 'Guard Name:', value: data.guardName },
-      { label: 'Client Name:', value: data.clientName },
-      { label: 'Total Hours:', value: `${data.totalHours} hours` }
-    ];
+    doc.fontSize(10).font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Insurance Number:', infoBoxX + 10, infoY + 20, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text(data.insuranceNumber || 'N/A', infoBoxX + 110, infoY + 10);
 
-    leftCol.forEach((item, idx) => {
-      doc.font('Helvetica-Bold')
-        .fillColor(this.secondaryColor)
-        .text(item.label, col1X, currentY + idx * lineHeight, { width: 100 });
-
-      doc.font('Helvetica')
-        .fillColor('#000')
-        .text(item.value, col1X + 110, currentY + idx * lineHeight);
-    });
+    doc.fontSize(10).font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Pay Rate (£/hour):', infoBoxX + 10, infoY + 40, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text('£' + (parseFloat(data.payRate) || 0).toFixed(2), infoBoxX + 110, infoY + 30);
 
     // Right column
-    const rightCol = [
-      { label: 'Account Holder:', value: data.accountHolderName },
-      { label: 'Account Number:', value: data.accountNo },
-      { label: 'Sort Code:', value: data.sortCode }
-    ];
+    doc.fontSize(10).font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Client Name:', infoBoxX + infoBoxWidth / 2 + 10, infoY, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text(data.clientName || 'N/A', infoBoxX + infoBoxWidth / 2 + 110, infoY - 10);
 
-    rightCol.forEach((item, idx) => {
-      doc.font('Helvetica-Bold')
-        .fillColor(this.secondaryColor)
-        .text(item.label, col2X, currentY + idx * lineHeight, { width: 100 });
+    doc.fontSize(10).font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Charge Rate (£/hour):', infoBoxX + infoBoxWidth / 2 + 10, infoY + 20, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text('£' + (parseFloat(data.chargeRate) || 0).toFixed(2), infoBoxX + infoBoxWidth / 2 + 110, infoY + 10);
 
-      doc.font('Helvetica')
-        .fillColor('#000')
-        .text(item.value, col2X + 110, currentY + idx * lineHeight);
-    });
+    doc.fontSize(10).font('Helvetica');
+    doc.fillColor('#666666');
+    doc.text('Status:', infoBoxX + infoBoxWidth / 2 + 10, infoY + 40, { continued: false });
+    doc.fillColor('#000000');
+    doc.fontSize(11).font('Helvetica-Bold');
+    doc.text(data.status || 'Pending', infoBoxX + infoBoxWidth / 2 + 110, infoY + 30);
 
-    doc.moveDown(3.5);
+    doc.y = infoY + 100;
   }
 
-  addProfessionalPaymentDetails(doc, data, payNumber) {
-    // Section title
-    doc.fontSize(11)
-      .font('Helvetica-Bold')
-      .fillColor('#000')
-      .text('PAYMENT SUMMARY', this.margin, doc.y);
+  /**
+   * Add working hours and rates section with associated guard data
+   */
+  addWorkingHoursSection(doc, data) {
+    this.addSectionTitle(doc, '⏰ WORKING HOURS & RATES');
 
-    // Underline
-    doc.moveTo(this.margin, doc.y + 5)
-      .lineTo(this.pageWidth - this.margin, doc.y + 5)
-      .strokeColor(this.secondaryColor)
-      .stroke();
-
-    doc.moveDown(1.5);
-
-    const payAmount = payNumber === 1 ? data.pay1 : payNumber === 2 ? data.pay2 : data.pay3;
-    const calculatedAmount = data.totalHours * data.payRate;
-
-    // Table dimensions
     const tableX = this.margin;
     const tableWidth = this.pageWidth - 2 * this.margin;
-    const col1Width = tableWidth * 0.65;
-    const col2Width = tableWidth * 0.35;
-    const rowHeight = 25;
+    const colWidth = tableWidth / 2;
 
-    // Table header
-    const headerY = doc.y;
-    doc.rect(tableX, headerY, col1Width, rowHeight)
-      .fillAndStroke(this.primaryColor, this.primaryColor);
+    // Set default values for missing data
+    const totalHours = data.totalHours || 0;
+    const totalMinutes = data.totalMinutes || 0;
+    const payRate = parseFloat(data.payRate) || 0;
+    const chargeRate = parseFloat(data.chargeRate) || 0;
+    const totalHoursDecimal = totalHours + totalMinutes / 60;
 
-    doc.fontSize(10)
-      .font('Helvetica-Bold')
-      .fillColor('#ffffff')
-      .text('Description', tableX + 12, headerY + 6, { width: col1Width - 24 });
+    // Get hours distribution if available
+    const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || totalHoursDecimal;
+    const associatedGuardHours = (data.hoursDistribution?.associatedGuardHours) || 0;
+    const associatedGuardName = (data.hoursDistribution?.associatedGuardId?.guardName) || '';
 
-    doc.rect(tableX + col1Width, headerY, col2Width, rowHeight)
-      .fillAndStroke(this.primaryColor, this.primaryColor);
+    // Draw table
+    this.drawTableRow(doc, tableX, doc.y, [
+      { text: 'Total Hours', width: colWidth / 2 },
+      { text: totalHours.toString(), width: colWidth / 2 },
+      { text: 'Total Minutes', width: colWidth / 2 },
+      { text: totalMinutes.toString(), width: colWidth / 2 }
+    ]);
 
-    doc.fontSize(10)
-      .font('Helvetica-Bold')
-      .fillColor('#ffffff')
-      .text('Amount', tableX + col1Width + 12, headerY + 6, { width: col2Width - 24, align: 'right' });
+    this.drawTableRow(doc, tableX, doc.y, [
+      { text: 'Hours in Decimal', width: colWidth / 2 },
+      { text: totalHoursDecimal.toFixed(2), width: colWidth / 2 },
+      { text: 'Pay Rate (£/hour)', width: colWidth / 2 },
+      { text: '£' + payRate.toFixed(2), width: colWidth / 2 }
+    ]);
 
-    doc.moveDown(1.8);
+    this.drawTableRow(doc, tableX, doc.y, [
+      { text: 'Charge Rate (£/hour)', width: colWidth / 2 },
+      { text: '£' + chargeRate.toFixed(2), width: colWidth / 2 },
+      { text: 'Total Pay', width: colWidth / 2 },
+      { text: '£' + (totalHoursDecimal * payRate).toFixed(2), width: colWidth / 2, isBold: true }
+    ]);
 
-    // Table rows
-    const rows = [
-      { label: 'Hours Worked', value: data.totalHours.toString() },
-      { label: 'Hourly Rate', value: `£${data.payRate.toFixed(2)}` },
-      { label: 'Calculated Amount (Hours × Rate)', value: `£${calculatedAmount.toFixed(2)}` },
-      { label: 'Approved Payment Amount', value: `£${payAmount.toFixed(2)}` }
-    ];
+    // Add hours distribution section if applicable
+    if (primaryGuardHours > 0 || associatedGuardHours > 0) {
+      doc.y += 10;
+      this.drawTableRow(doc, tableX, doc.y, [
+        { text: 'Primary Guard Hours', width: colWidth / 2 },
+        { text: primaryGuardHours.toFixed(2), width: colWidth / 2 },
+        { text: 'Associated Guard Hours', width: colWidth / 2 },
+        { text: associatedGuardHours.toFixed(2), width: colWidth / 2 }
+      ]);
 
-    rows.forEach((row, idx) => {
-      const bgColor = idx % 2 === 0 ? this.lightGray : '#ffffff';
-      const borderColor = this.borderColor;
-      const rowY = doc.y;
+      // Associated guard info if present
+      if (associatedGuardName) {
+        this.drawTableRow(doc, tableX, doc.y, [
+          { text: 'Associated Guard', width: colWidth / 2 },
+          { text: associatedGuardName, width: colWidth / 2 },
+          { text: 'Guard Pay', width: colWidth / 2 },
+          { text: '£' + (associatedGuardHours * payRate).toFixed(2), width: colWidth / 2 }
+        ]);
+      }
+    }
 
-      // Left cell
-      doc.rect(tableX, rowY, col1Width, rowHeight)
-        .fillAndStroke(bgColor, borderColor);
+    doc.y += 20;
+  }
 
-      doc.fontSize(9)
-        .font(idx === rows.length - 1 ? 'Helvetica-Bold' : 'Helvetica')
-        .fillColor(idx === rows.length - 1 ? this.primaryColor : '#000')
-        .text(row.label, tableX + 12, rowY + 7, { width: col1Width - 24 });
+  /**
+   * Add bank accounts section
+   */
+  addBankAccountsSection(doc, data) {
+    // Check for single account in old format or multiple accounts
+    const hasOldFormat = data.accountNo || data.sortCode || data.accountHolderName;
+    const bankAccounts = data.bankAccounts || [];
+    
+    if (!hasOldFormat && bankAccounts.length === 0) {
+      return;
+    }
 
-      // Right cell - use same rowY for alignment
-      doc.rect(tableX + col1Width, rowY, col2Width, rowHeight)
-        .fillAndStroke(bgColor, borderColor);
+    this.addSectionTitle(doc, '🏦 BANK ACCOUNT(S)');
 
-      doc.fontSize(9)
-        .font(idx === rows.length - 1 ? 'Helvetica-Bold' : 'Helvetica')
-        .fillColor(idx === rows.length - 1 ? this.accentColor : '#000')
-        .text(row.value, tableX + col1Width + 12, rowY + 7, { width: col2Width - 24, align: 'right' });
+    // Handle old format (single account)
+    if (hasOldFormat) {
+      const boxX = this.margin;
+      const boxWidth = this.pageWidth - 2 * this.margin;
+      doc.rect(boxX, doc.y, boxWidth, 70).fill(this.lightGray);
 
-      doc.moveDown(1.8);
-    });
+      const boxY = doc.y + 10;
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
 
-    // Total row
-    const totalY = doc.y;
-    doc.rect(tableX, totalY, col1Width, rowHeight * 1.2)
-      .fillAndStroke(this.primaryColor, this.primaryColor);
+      doc.text('Account Holder:', boxX + 10, boxY);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(data.accountHolderName || 'N/A', boxX + 150, boxY - 9);
 
-    doc.fontSize(11)
-      .font('Helvetica-Bold')
-      .fillColor('#ffffff')
-      .text('TOTAL PAYMENT DUE', tableX + 12, totalY + 8, { width: col1Width - 24 });
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Bank Name:', boxX + 10, boxY + 15);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(data.bankName || 'N/A', boxX + 150, boxY + 6);
 
-    doc.rect(tableX + col1Width, totalY, col2Width, rowHeight * 1.2)
-      .fillAndStroke(this.accentColor, this.accentColor);
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Sort Code:', boxX + 10, boxY + 30);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(data.sortCode || 'N/A', boxX + 150, boxY + 21);
 
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Account #:', boxX + 10, boxY + 45);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(data.accountNo || 'N/A', boxX + 150, boxY + 36);
+
+      doc.y += 85;
+    } else {
+      // Handle new format (multiple accounts)
+      bankAccounts.forEach((account, index) => {
+        const isActive = account.active !== false;
+        const isPrimary = account.isPrimary === true;
+        
+        const boxX = this.margin;
+        const boxWidth = this.pageWidth - 2 * this.margin;
+        doc.rect(boxX, doc.y, boxWidth, 70).fill(this.lightGray);
+
+        const boxY = doc.y + 10;
+        doc.fontSize(9).font('Helvetica').fillColor('#666666');
+
+        doc.text('Account Holder:', boxX + 10, boxY);
+        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+        doc.text(account.accountHolderName || 'N/A', boxX + 150, boxY - 9);
+
+        doc.fontSize(9).font('Helvetica').fillColor('#666666');
+        doc.text('Bank Name:', boxX + 10, boxY + 15);
+        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+        doc.text(account.bankName || 'N/A', boxX + 150, boxY + 6);
+
+        doc.fontSize(9).font('Helvetica').fillColor('#666666');
+        doc.text('Sort Code:', boxX + 10, boxY + 30);
+        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+        doc.text(account.sortCode || 'N/A', boxX + 150, boxY + 21);
+
+        doc.fontSize(9).font('Helvetica').fillColor('#666666');
+        doc.text('Account #:', boxX + 10, boxY + 45);
+        doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+        doc.text(account.accountNumber || 'N/A', boxX + 150, boxY + 36);
+
+        doc.y += 85;
+      });
+    }
+  }
+
+  /**
+   * Add payment summary section
+   */
+  addPaymentSummary(doc, data, payNumber = 1) {
+    this.addSectionTitle(doc, '💰 PAYMENT SUMMARY');
+
+    const totalHoursDecimal = (data.totalHours || 0) + ((data.totalMinutes || 0) / 60);
+    const payRate = parseFloat(data.payRate) || 0;
+    const chargeRate = parseFloat(data.chargeRate) || 0;
+    const totalPay = totalHoursDecimal * payRate;
+    const totalCharge = totalHoursDecimal * chargeRate;
+
+    // Get the appropriate payment amount based on payNumber
+    let paymentAmount = 0;
+    if (payNumber === 1) paymentAmount = data.pay1 || totalPay;
+    else if (payNumber === 2) paymentAmount = data.pay2 || totalPay;
+    else if (payNumber === 3) paymentAmount = data.pay3 || totalPay;
+    else paymentAmount = totalPay;
+
+    // Get hours distribution if available
+    const primaryGuardHours = (data.hoursDistribution?.primaryGuardHours) || totalHoursDecimal;
+    const associatedGuardHours = (data.hoursDistribution?.associatedGuardHours) || 0;
+    const associatedGuardName = (data.hoursDistribution?.associatedGuardId?.guardName) || '';
+
+    const summaryBoxX = this.margin;
+    const summaryBoxWidth = this.pageWidth - 2 * this.margin;
+
+    // Summary box
+    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 120)
+      .stroke(this.borderColor);
+
+    const summaryY = doc.y + 15;
+
+    // Left column
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Hours Worked:', summaryBoxX + 20, summaryY);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text(totalHoursDecimal.toFixed(2) + ' hours', summaryBoxX + 150, summaryY - 10);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Pay Rate:', summaryBoxX + 20, summaryY + 20);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + payRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 10);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Primary Guard Hours:', summaryBoxX + 20, summaryY + 40);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text(primaryGuardHours.toFixed(2) + ' hours', summaryBoxX + 150, summaryY + 30);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Charge Rate:', summaryBoxX + 20, summaryY + 60);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + chargeRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 50);
+
+    // Right column
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(this.accentColor);
+    doc.text('TOTAL PAY (Amount):', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY);
+    doc.fontSize(14).fillColor(this.accentColor);
+    doc.text('£' + paymentAmount.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY - 10);
+
+    doc.fontSize(9).font('Helvetica').fillColor('#666666');
+    doc.text('Calculated (Hours × Rate):', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 20);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + totalPay.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 10);
+
+    doc.fontSize(9).font('Helvetica').fillColor('#666666');
+    doc.text('Total Charge:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 40);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + totalCharge.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 30);
+
+    // Associated guard info if present
+    if (associatedGuardHours > 0 && associatedGuardName) {
+      doc.fontSize(10).font('Helvetica').fillColor('#666666');
+      doc.text(associatedGuardName + ' Hours:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 60);
+      doc.fillColor('#000000').font('Helvetica-Bold');
+      doc.text(associatedGuardHours.toFixed(2) + ' hours', summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 50);
+    }
+
+    doc.y += 140;
+  }
+
+  /**
+   * Add footer
+   */
+  addFooter(doc) {
+    const footerY = this.pageHeight - this.margin - 20;
+
+    // Divider line
+    doc.moveTo(this.margin, footerY)
+      .lineTo(this.pageWidth - this.margin, footerY)
+      .stroke(this.borderColor);
+
+    // Footer text
+    doc.fontSize(9)
+      .fillColor('#999999')
+      .text('This is a confidential payroll statement. For official use only.', 
+        this.margin, footerY + 10, 
+        { align: 'center', width: this.pageWidth - 2 * this.margin });
+
+    doc.fontSize(8)
+      .text('Generated on ' + new Date().toLocaleString('en-GB'), 
+        this.margin, footerY + 25, 
+        { align: 'center', width: this.pageWidth - 2 * this.margin });
+  }
+
+  /**
+   * Add section title
+   */
+  addSectionTitle(doc, title) {
+    const sectionY = doc.y + 10;
+
+    // Background line
+    doc.rect(this.margin, sectionY, this.pageWidth - 2 * this.margin, 30)
+      .fill(this.primaryColor);
+
+    // Title
     doc.fontSize(13)
       .font('Helvetica-Bold')
       .fillColor('#ffffff')
-      .text(`£${payAmount.toFixed(2)}`, tableX + col1Width + 12, totalY + 8, { width: col2Width - 24, align: 'right' });
+      .text(title, this.margin + 15, sectionY + 6, { width: this.pageWidth - 2 * this.margin - 30 });
 
-    doc.moveDown(2.5);
+    doc.y = sectionY + 35;
   }
 
-  addBankDetailsSection(doc, data) {
-    // Section title
-    doc.fontSize(11)
-      .font('Helvetica-Bold')
-      .fillColor('#000')
-      .text('BANK TRANSFER DETAILS', this.margin, doc.y);
+  /**
+   * Draw a table row
+   */
+  drawTableRow(doc, startX, startY, cells) {
+    const rowHeight = 30;
+    const borderColor = this.borderColor;
 
-    // Underline
-    doc.moveTo(this.margin, doc.y + 5)
-      .lineTo(this.pageWidth - this.margin, doc.y + 5)
-      .strokeColor(this.secondaryColor)
-      .stroke();
+    // Draw cells
+    let currentX = startX;
+    cells.forEach(cell => {
+      const cellWidth = cell.width;
 
-    doc.moveDown(1.5);
+      // Cell background
+      doc.rect(currentX, startY, cellWidth, rowHeight)
+        .fillAndStroke(this.lightGray, borderColor);
 
-    // Info box
-    doc.rect(this.margin, doc.y, this.pageWidth - 2 * this.margin, 70)
-      .fillAndStroke(this.lightGray, this.borderColor);
+      // Cell text
+      doc.fontSize(10);
+      if (cell.isBold) {
+        doc.font('Helvetica-Bold').fillColor(this.primaryColor);
+      } else {
+        doc.font('Helvetica').fillColor('#333333');
+      }
 
-    const boxX = this.margin + 12;
-    const boxY = doc.y + 10;
+      doc.text(cell.text, currentX + 8, startY + 8, {
+        width: cellWidth - 16,
+        align: 'left'
+      });
 
-    doc.fontSize(9)
-      .font('Helvetica');
+      currentX += cellWidth;
+    });
 
-    doc.fillColor(this.secondaryColor)
-      .font('Helvetica-Bold')
-      .text('Account Holder:', boxX, boxY);
-
-    doc.fillColor('#000')
-      .font('Helvetica')
-      .text(data.accountHolderName, boxX + 110, boxY);
-
-    doc.fillColor(this.secondaryColor)
-      .font('Helvetica-Bold')
-      .text('Account Number:', boxX, boxY + 20);
-
-    doc.fillColor('#000')
-      .font('Helvetica')
-      .text(data.accountNo, boxX + 110, boxY + 20);
-
-    doc.fillColor(this.secondaryColor)
-      .font('Helvetica-Bold')
-      .text('Sort Code:', boxX, boxY + 40);
-
-    doc.fillColor('#000')
-      .font('Helvetica')
-      .text(data.sortCode, boxX + 110, boxY + 40);
-
-    doc.moveDown(4.5);
+    doc.y = startY + rowHeight;
   }
 
-  addProfessionalFooter(doc) {
-    // Divider line
-    doc.moveTo(this.margin, doc.y)
-      .lineTo(this.pageWidth - this.margin, doc.y)
-      .strokeColor(this.borderColor)
-      .stroke();
-
-    doc.moveDown(1);
-
-    // Footer text
-    doc.fontSize(8)
-      .font('Helvetica')
-      .fillColor('#666666')
-      .text('This is an automatically generated payroll document. Please retain for your records. For any discrepancies, contact your administrator.', 
-            this.margin, doc.y, { align: 'center', width: this.pageWidth - 2 * this.margin });
-
-    doc.moveDown(0.5);
-
-    doc.fontSize(7)
-      .fillColor('#999999')
-      .text(`Generated on ${new Date().toLocaleDateString()} | Document ID: ${Date.now()}`, 
-            { align: 'center' });
-
-    doc.fillColor('#000');
-  }
-
+  /**
+   * Generate bulk payroll PDF
+   */
   async generateBulkPayrollPDF(payrollDataArray, outputPath) {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
           size: 'A4',
-          margin: this.margin
+          margin: this.margin,
+          bufferPages: true
         });
 
         let buffers = [];
 
         if (outputPath) {
-          // For local file system (localhost)
           const stream = fs.createWriteStream(outputPath);
           doc.pipe(stream);
 
@@ -378,47 +499,23 @@ class PayrollPDFGenerator {
             if (index > 0) {
               doc.addPage();
             }
-
-            this.addProfessionalHeader(doc, 1);
-            this.addProfessionalEmployeeInfo(doc, data);
-            this.addProfessionalPaymentDetails(doc, data, 1);
-            this.addBankDetailsSection(doc, data);
-            this.addProfessionalFooter(doc);
+            this.buildPDFContent(doc, data, 1);
           });
 
           doc.end();
 
-          stream.on('finish', () => {
-            resolve(outputPath);
-          });
-
-          stream.on('error', (error) => {
-            reject(error);
-          });
+          stream.on('finish', () => resolve(outputPath));
+          stream.on('error', reject);
         } else {
-          // For serverless (Vercel) - return buffer
-          doc.on('data', (chunk) => {
-            buffers.push(chunk);
-          });
-
-          doc.on('end', () => {
-            resolve(Buffer.concat(buffers));
-          });
-
-          doc.on('error', (error) => {
-            reject(error);
-          });
+          doc.on('data', chunk => buffers.push(chunk));
+          doc.on('end', () => resolve(Buffer.concat(buffers)));
+          doc.on('error', reject);
 
           payrollDataArray.forEach((data, index) => {
             if (index > 0) {
               doc.addPage();
             }
-
-            this.addProfessionalHeader(doc, 1);
-            this.addProfessionalEmployeeInfo(doc, data);
-            this.addProfessionalPaymentDetails(doc, data, 1);
-            this.addBankDetailsSection(doc, data);
-            this.addProfessionalFooter(doc);
+            this.buildPDFContent(doc, data, 1);
           });
 
           doc.end();
