@@ -438,28 +438,16 @@ app.post('/api/payroll/generate-pdf', async (req, res) => {
       });
     }
 
-    // Create unique filename
-    const timestamp = Date.now();
-    const filename = `payroll_${String(payNumber).padStart(2, '0')}_${payrollData.guardName}_${timestamp}.pdf`;
-    const filepath = path.join(__dirname, 'public/uploads', filename);
+    // Generate PDF as buffer (works on serverless platforms)
+    const pdfBuffer = await pdfGenerator.generatePayrollPDF(payrollData, payNumber);
 
-    // Generate PDF
-    await pdfGenerator.generatePayrollPDF(payrollData, payNumber, filepath);
-
-    // Read file and send
-    const fileStream = fs.createReadStream(filepath);
-    
+    // Set headers and send
+    const filename = `payroll_${String(payNumber).padStart(2, '0')}_${payrollData.guardName}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
     
-    fileStream.pipe(res);
-
-    // Clean up file after sending
-    res.on('finish', () => {
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-    });
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Error generating PDF:', error);
     res.status(500).json({
@@ -486,26 +474,16 @@ app.post('/api/export/pdf', async (req, res) => {
       });
     }
 
+    // Generate bulk PDF as buffer (works on serverless platforms)
+    const pdfBuffer = await pdfGenerator.generateBulkPayrollPDF(records);
+
+    // Set headers and send
     const filename = `payroll_export_${Date.now()}.pdf`;
-    const filepath = path.join(__dirname, 'public/uploads', filename);
-
-    // Generate bulk PDF
-    await pdfGenerator.generateBulkPayrollPDF(records, filepath);
-
-    // Read file and send
-    const fileStream = fs.createReadStream(filepath);
-    
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
     
-    fileStream.pipe(res);
-
-    // Clean up file after sending
-    res.on('finish', () => {
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-    });
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Error exporting PDF:', error);
     res.status(500).json({
@@ -530,11 +508,8 @@ app.post('/api/export/excel', async (req, res) => {
       });
     }
 
-    const filename = `payroll_export_${Date.now()}.xlsx`;
-    const filepath = path.join(__dirname, 'public/uploads', filename);
-
-    // Generate Excel file
-    const result = excelParser.generateExcelFromData(records, filepath);
+    // Generate Excel file as buffer (works on serverless platforms)
+    const result = excelParser.generateExcelFromData(records);
 
     if (!result.success) {
       return res.status(500).json({
@@ -544,20 +519,13 @@ app.post('/api/export/excel', async (req, res) => {
       });
     }
 
-    // Read file and send
-    const fileStream = fs.createReadStream(filepath);
-    
+    // Set headers and send
+    const filename = `payroll_export_${Date.now()}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', result.buffer.length);
     
-    fileStream.pipe(res);
-
-    // Clean up file after sending
-    res.on('finish', () => {
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-    });
+    res.send(result.buffer);
   } catch (error) {
     console.error('Error exporting Excel:', error);
     res.status(500).json({

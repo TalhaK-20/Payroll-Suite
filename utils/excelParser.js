@@ -170,13 +170,23 @@ class ExcelParser {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll');
 
-      XLSX.writeFile(workbook, outputPath);
-
-      return {
-        success: true,
-        filePath: outputPath,
-        message: 'Excel file generated successfully'
-      };
+      // If outputPath is provided, write to file; otherwise return buffer
+      if (outputPath) {
+        XLSX.writeFile(workbook, outputPath);
+        return {
+          success: true,
+          filePath: outputPath,
+          message: 'Excel file generated successfully'
+        };
+      } else {
+        // For serverless platforms, write to buffer
+        const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+        return {
+          success: true,
+          buffer: buffer,
+          message: 'Excel file generated successfully'
+        };
+      }
     } catch (error) {
       return {
         success: false,

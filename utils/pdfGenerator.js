@@ -22,33 +22,69 @@ class PayrollPDFGenerator {
           margin: this.margin
         });
 
-        const stream = fs.createWriteStream(outputPath);
-        doc.pipe(stream);
+        // If outputPath is provided, use file stream; otherwise use buffer
+        let buffers = [];
+        
+        if (outputPath) {
+          // For local file system (localhost)
+          const stream = fs.createWriteStream(outputPath);
+          doc.pipe(stream);
+          
+          // Professional Header
+          this.addProfessionalHeader(doc, payNumber);
 
-        // Professional Header
-        this.addProfessionalHeader(doc, payNumber);
+          // Employee Information
+          this.addProfessionalEmployeeInfo(doc, payrollData);
 
-        // Employee Information
-        this.addProfessionalEmployeeInfo(doc, payrollData);
+          // Payment Details Table
+          this.addProfessionalPaymentDetails(doc, payrollData, payNumber);
 
-        // Payment Details Table
-        this.addProfessionalPaymentDetails(doc, payrollData, payNumber);
+          // Bank Details Section
+          this.addBankDetailsSection(doc, payrollData);
 
-        // Bank Details Section
-        this.addBankDetailsSection(doc, payrollData);
+          // Professional Footer
+          this.addProfessionalFooter(doc);
 
-        // Professional Footer
-        this.addProfessionalFooter(doc);
+          doc.end();
 
-        doc.end();
+          stream.on('finish', () => {
+            resolve(outputPath);
+          });
 
-        stream.on('finish', () => {
-          resolve(outputPath);
-        });
+          stream.on('error', (error) => {
+            reject(error);
+          });
+        } else {
+          // For serverless (Vercel) - return buffer
+          doc.on('data', (chunk) => {
+            buffers.push(chunk);
+          });
 
-        stream.on('error', (error) => {
-          reject(error);
-        });
+          doc.on('end', () => {
+            resolve(Buffer.concat(buffers));
+          });
+
+          doc.on('error', (error) => {
+            reject(error);
+          });
+
+          // Professional Header
+          this.addProfessionalHeader(doc, payNumber);
+
+          // Employee Information
+          this.addProfessionalEmployeeInfo(doc, payrollData);
+
+          // Payment Details Table
+          this.addProfessionalPaymentDetails(doc, payrollData, payNumber);
+
+          // Bank Details Section
+          this.addBankDetailsSection(doc, payrollData);
+
+          // Professional Footer
+          this.addProfessionalFooter(doc);
+
+          doc.end();
+        }
       } catch (error) {
         reject(error);
       }
@@ -324,38 +360,73 @@ class PayrollPDFGenerator {
   }
 
   async generateBulkPayrollPDF(payrollDataArray, outputPath) {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: this.margin
-      });
-
-      const stream = fs.createWriteStream(outputPath);
-      doc.pipe(stream);
-
-      payrollDataArray.forEach((data, index) => {
-        if (index > 0) {
-          doc.addPage();
-        }
-
-        this.addProfessionalHeader(doc, 1);
-        this.addProfessionalEmployeeInfo(doc, data);
-        this.addProfessionalPaymentDetails(doc, data, 1);
-        this.addBankDetailsSection(doc, data);
-        this.addProfessionalFooter(doc);
-      });
-
-      doc.end();
-
-      return new Promise((resolve, reject) => {
-        stream.on('finish', () => {
-          resolve(outputPath);
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margin: this.margin
         });
-        stream.on('error', reject);
-      });
-    } catch (error) {
-      throw error;
-    }
+
+        let buffers = [];
+
+        if (outputPath) {
+          // For local file system (localhost)
+          const stream = fs.createWriteStream(outputPath);
+          doc.pipe(stream);
+
+          payrollDataArray.forEach((data, index) => {
+            if (index > 0) {
+              doc.addPage();
+            }
+
+            this.addProfessionalHeader(doc, 1);
+            this.addProfessionalEmployeeInfo(doc, data);
+            this.addProfessionalPaymentDetails(doc, data, 1);
+            this.addBankDetailsSection(doc, data);
+            this.addProfessionalFooter(doc);
+          });
+
+          doc.end();
+
+          stream.on('finish', () => {
+            resolve(outputPath);
+          });
+
+          stream.on('error', (error) => {
+            reject(error);
+          });
+        } else {
+          // For serverless (Vercel) - return buffer
+          doc.on('data', (chunk) => {
+            buffers.push(chunk);
+          });
+
+          doc.on('end', () => {
+            resolve(Buffer.concat(buffers));
+          });
+
+          doc.on('error', (error) => {
+            reject(error);
+          });
+
+          payrollDataArray.forEach((data, index) => {
+            if (index > 0) {
+              doc.addPage();
+            }
+
+            this.addProfessionalHeader(doc, 1);
+            this.addProfessionalEmployeeInfo(doc, data);
+            this.addProfessionalPaymentDetails(doc, data, 1);
+            this.addBankDetailsSection(doc, data);
+            this.addProfessionalFooter(doc);
+          });
+
+          doc.end();
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 }
 
