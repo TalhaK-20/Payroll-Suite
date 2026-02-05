@@ -65,6 +65,13 @@ const payrollSchema = new mongoose.Schema({
     default: ''
   },
 
+  // Guard Reference
+  guardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GuardMaster',
+    default: null
+  },
+
   // Guard Basic Information
   guardName: {
     type: String,
@@ -111,6 +118,37 @@ const payrollSchema = new mongoose.Schema({
     min: 0,
     max: 59,
     default: 0
+  },
+
+  // Associated Guard Hour Distribution
+  hoursDistribution: {
+    primaryGuardHours: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    associatedGuardHours: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    associatedGuardId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'GuardMaster',
+      default: null
+    },
+    associatedGuardName: {
+      type: String,
+      trim: true,
+      default: ''
+    }
+  },
+
+  // Payroll Status
+  status: {
+    type: String,
+    enum: ['pending', 'ongoing', 'completed'],
+    default: 'pending'
   },
 
   // Rates
@@ -177,6 +215,18 @@ const payrollSchema = new mongoose.Schema({
 // Virtual field for total hours in decimal format
 payrollSchema.virtual('totalHoursDecimal').get(function() {
   return this.totalHours + (this.totalMinutes / 60);
+});
+
+// Virtual field for hours spent (sum of primary and associated guard hours)
+payrollSchema.virtual('hoursSpent').get(function() {
+  const primaryHours = this.hoursDistribution?.primaryGuardHours || 0;
+  const associatedHours = this.hoursDistribution?.associatedGuardHours || 0;
+  return primaryHours + associatedHours;
+});
+
+// Virtual field for remaining hours
+payrollSchema.virtual('remainingHours').get(function() {
+  return this.totalHoursDecimal - this.hoursSpent;
 });
 
 // Virtual field for total pay

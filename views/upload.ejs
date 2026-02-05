@@ -12,13 +12,16 @@
     <div class="container">
       <div class="header-brand">
         <img src="/images/salary.png" alt="Payroll Logo" class="logo">
-        <h1>Payroll Management System</h1>
+        <h1>💼 Payroll Pro</h1>
       </div>
       <nav>
         <ul>
-          <li><a href="/">Dashboard</a></li>
-          <li><a href="/upload">Upload Excel</a></li>
-          <li><a href="#" onclick="openAddForm(); return false;">Add Record</a></li>
+          <li><a href="/">🏠 Home</a></li>
+          <li><a href="/guards">👥 Guards</a></li>
+          <li><a href="/clients">🏢 Clients</a></li>
+          <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
+          <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/upload">📤 Upload</a></li>
         </ul>
       </nav>
     </div>
@@ -97,15 +100,78 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Client Name <span class="required">*</span></label>
-            <input type="text" id="clientName" name="clientName" required>
+            <select id="clientId" name="clientId" required onchange="updateClientName()">
+              <option value="">Select Client</option>
+              <!-- Options will be populated by JavaScript -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Client Name (Display)</label>
+            <input type="text" id="clientName" name="clientName" readonly style="background-color: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Guard <span class="required">*</span></label>
+            <select id="guardId" name="guardId" required onchange="updateGuardDetails()">
+              <option value="">Select Guard</option>
+              <!-- Options will be populated by JavaScript -->
+            </select>
           </div>
           <div class="form-group">
             <label>Guard Name <span class="required">*</span></label>
-            <input type="text" id="guardName" name="guardName" required>
+            <input type="text" id="guardName" name="guardName" readonly style="background-color: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Nationality <span class="required">*</span></label>
+            <input type="text" id="nationality" name="nationality" readonly style="background-color: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Associated Guard (Optional)</label>
+            <select id="associatedGuardId" name="associatedGuardId" onchange="updateAssociatedGuardName()">
+              <option value="">None</option>
+              <!-- Options will be populated by JavaScript -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Associated Guard Name</label>
+            <input type="text" id="associatedGuardName" name="associatedGuardName" readonly style="background-color: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Hours to Transfer (Optional)</label>
+            <input type="number" id="associatedGuardHours" name="associatedGuardHours" step="0.5" min="0" onchange="updatePrimaryGuardHours(); updateTotalHoursDisplay();" oninput="updateTotalHoursDisplay();">
+          </div>
+          <div class="form-group">
+            <label>Associated Guard Pay Rate (£/hour)</label>
+            <input type="number" id="associatedGuardPayRate" name="associatedGuardPayRate" step="0.01" min="0" onchange="updateAssociatedGuardPay()">
+          </div>
+          <div class="form-group">
+            <label>Associated Guard Total Pay (£)</label>
+            <input type="number" id="associatedGuardPay" name="associatedGuardPay" step="0.01" min="0" readonly style="background-color: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Primary Guard Hours</label>
+            <input type="number" id="primaryGuardHours" name="primaryGuardHours" step="0.5" min="0" readonly style="background-color: #f5f5f5;">
           </div>
           <div class="form-group">
             <label>Total Hours <span class="required">*</span></label>
-            <input type="number" id="totalHours" name="totalHours" step="0.5" min="0" required>
+            <input type="number" id="totalHours" name="totalHours" step="0.5" min="0" required onchange="updatePrimaryGuardHours(); updateTotalHoursDisplay();" oninput="updateTotalHoursDisplay();">
+          </div>
+          <!-- Dynamic Total Hours Summary -->
+          <div class="form-group" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 5px; color: white; margin: 10px 0;">
+            <label style="color: white; margin-bottom: 5px; display: block;">📊 Total Hours Summary</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="padding: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; text-align: center;">
+                <small style="display: block; opacity: 0.9;">Primary Guard</small>
+                <strong id="primaryHoursSummary" style="font-size: 1.3em;">0.0</strong> hrs
+              </div>
+              <div style="padding: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; text-align: center;">
+                <small style="display: block; opacity: 0.9;">Associated Guard</small>
+                <strong id="associatedHoursSummary" style="font-size: 1.3em;">0.0</strong> hrs
+              </div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); text-align: center;">
+              <small style="display: block; opacity: 0.9;">Total Hours</small>
+              <strong id="totalHoursSummary" style="font-size: 1.5em;">0.0</strong> hrs
+            </div>
           </div>
           <div class="form-group">
             <label>Pay Rate (£/hour) <span class="required">*</span></label>
@@ -128,16 +194,23 @@
             <input type="number" id="pay3" name="pay3" step="0.01" min="0" required>
           </div>
           <div class="form-group">
+            <label>Bank Account <span class="required">*</span></label>
+            <select id="bankAccountId" name="bankAccountId" required onchange="updateBankAccountFields()">
+              <option value="">Select Bank Account</option>
+              <!-- Options will be populated by JavaScript -->
+            </select>
+          </div>
+          <div class="form-group">
             <label>Account Number <span class="required">*</span></label>
-            <input type="text" id="accountNo" name="accountNo" required>
+            <input type="text" id="accountNo" name="accountNo" required readonly style="background-color: #f5f5f5;">
           </div>
           <div class="form-group">
             <label>Sort Code <span class="required">*</span></label>
-            <input type="text" id="sortCode" name="sortCode" placeholder="e.g., 20-20-20">
+            <input type="text" id="sortCode" name="sortCode" placeholder="e.g., 20-20-20" readonly style="background-color: #f5f5f5;">
           </div>
           <div class="form-group">
             <label>Account Holder Name <span class="required">*</span></label>
-            <input type="text" id="accountHolderName" name="accountHolderName" required>
+            <input type="text" id="accountHolderName" name="accountHolderName" required readonly style="background-color: #f5f5f5;">
           </div>
         </div>
 
@@ -152,6 +225,183 @@
   <script src="/js/main.js"></script>
   <script>
     let uploadedRecords = [];
+    let guardsData = [];
+    let bankAccountsData = [];
+    let clientsData = [];
+
+    // Load guards, banks, and clients on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadClientsDropdown();
+      loadGuardsDropdown();
+      loadBankAccountsDropdown();
+    });
+
+    async function loadGuardsDropdown() {
+      try {
+        const response = await fetch('/api/guards');
+        const result = await response.json();
+
+        if (result.success) {
+          guardsData = result.data;
+          const dropdown = document.getElementById('guardId');
+          dropdown.innerHTML = '<option value="">Select Guard</option>' +
+            result.data.map(guard => `
+              <option value="${guard._id}" data-guard-name="${guard.guardName}" data-nationality="${guard.nationality}">${guard.guardName}</option>
+            `).join('');
+          
+          // Also populate associated guard dropdown
+          loadAssociatedGuardsDropdown();
+        }
+      } catch (error) {
+        console.error('Error loading guards:', error);
+      }
+    }
+
+    async function loadClientsDropdown() {
+      try {
+        const response = await fetch('/api/clients');
+        const result = await response.json();
+
+        if (result.success) {
+          clientsData = result.data;
+          const dropdown = document.getElementById('clientId');
+          dropdown.innerHTML = '<option value="">Select Client</option>' +
+            result.data.map(client => `
+              <option value="${client._id}" data-client-name="${client.name}">${client.name}</option>
+            `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading clients:', error);
+      }
+    }
+
+    function loadAssociatedGuardsDropdown() {
+      const dropdown = document.getElementById('associatedGuardId');
+      const currentGuardId = document.getElementById('guardId').value;
+      
+      dropdown.innerHTML = '<option value="">None</option>' +
+        guardsData
+          .filter(guard => guard._id !== currentGuardId) // Exclude currently selected guard
+          .map(guard => `
+            <option value="${guard._id}" data-guard-name="${guard.guardName}">${guard.guardName}</option>
+          `).join('');
+    }
+
+    async function loadBankAccountsDropdown() {
+      try {
+        const response = await fetch('/api/bank-accounts');
+        const result = await response.json();
+
+        if (result.success) {
+          bankAccountsData = result.data;
+          const dropdown = document.getElementById('bankAccountId');
+          dropdown.innerHTML = '<option value="">Select Bank Account</option>' +
+            result.data.map(account => `
+              <option value="${account._id}" data-account-number="${account.accountNumber}" data-sort-code="${account.sortCode}" data-holder="${account.accountHolderName}">
+                ${account.accountHolderName} - ${account.bankName}
+              </option>
+            `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading bank accounts:', error);
+      }
+    }
+
+    function updateClientName() {
+      const clientId = document.getElementById('clientId').value;
+      const selected = document.querySelector(`#clientId option[value="${clientId}"]`);
+      if (selected) {
+        document.getElementById('clientName').value = selected.dataset.clientName;
+      } else {
+        document.getElementById('clientName').value = '';
+      }
+    }
+
+    function updateGuardDetails() {
+      const guardId = document.getElementById('guardId').value;
+      console.log('Guard ID selected:', guardId);
+      
+      const selected = document.querySelector(`#guardId option[value="${guardId}"]`);
+      console.log('Selected option:', selected);
+      
+      if (selected) {
+        const guardName = selected.dataset.guardName;
+        const nationality = selected.dataset.nationality;
+        
+        console.log('Guard Name from dataset:', guardName);
+        console.log('Nationality from dataset:', nationality);
+        
+        document.getElementById('guardName').value = guardName;
+        document.getElementById('nationality').value = nationality;
+        
+        console.log('Set guardName field to:', document.getElementById('guardName').value);
+        console.log('Set nationality field to:', document.getElementById('nationality').value);
+        
+        // Reset associated guard when main guard changes
+        document.getElementById('associatedGuardId').value = '';
+        document.getElementById('associatedGuardName').value = '';
+        document.getElementById('associatedGuardHours').value = '';
+        document.getElementById('primaryGuardHours').value = '';
+        // Reload associated guards dropdown
+        loadAssociatedGuardsDropdown();
+      } else {
+        console.log('No guard option selected');
+        document.getElementById('guardName').value = '';
+        document.getElementById('nationality').value = '';
+      }
+    }
+
+    function updateAssociatedGuardName() {
+      const associatedId = document.getElementById('associatedGuardId').value;
+      const selected = document.querySelector(`#associatedGuardId option[value="${associatedId}"]`);
+      if (selected) {
+        document.getElementById('associatedGuardName').value = selected.dataset.guardName;
+      } else {
+        document.getElementById('associatedGuardName').value = '';
+      }
+    }
+
+    function updatePrimaryGuardHours() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const primaryHours = totalHours - associatedHours;
+      document.getElementById('primaryGuardHours').value = primaryHours > 0 ? primaryHours.toFixed(2) : 0;
+      
+      // Calculate associated guard pay if hours are set
+      updateAssociatedGuardPay();
+    }
+
+    function updateAssociatedGuardPay() {
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const associatedPayRate = parseFloat(document.getElementById('associatedGuardPayRate').value) || 0;
+      const totalPay = associatedHours * associatedPayRate;
+      document.getElementById('associatedGuardPay').value = totalPay.toFixed(2);
+    }
+
+    function updateTotalHoursDisplay() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const primaryHours = Math.max(0, totalHours - associatedHours);
+      
+      // Update summary display
+      document.getElementById('totalHoursSummary').textContent = totalHours.toFixed(1);
+      document.getElementById('primaryHoursSummary').textContent = primaryHours.toFixed(1);
+      document.getElementById('associatedHoursSummary').textContent = associatedHours.toFixed(1);
+    }
+
+    function updateBankAccountFields() {
+      const bankId = document.getElementById('bankAccountId').value;
+      const selected = document.querySelector(`#bankAccountId option[value="${bankId}"]`);
+      if (selected) {
+        document.getElementById('accountNo').value = selected.dataset.accountNumber;
+        document.getElementById('sortCode').value = selected.dataset.sortCode;
+        document.getElementById('accountHolderName').value = selected.dataset.holder;
+      } else {
+        document.getElementById('accountNo').value = '';
+        document.getElementById('sortCode').value = '';
+        document.getElementById('accountHolderName').value = '';
+      }
+    }
 
     async function generatePayroll(recordIndex, payNumber) {
       if (!uploadedRecords[recordIndex]) {

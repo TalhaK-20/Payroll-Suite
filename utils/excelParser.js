@@ -71,59 +71,40 @@ class ExcelParser {
     data.forEach((row, index) => {
       const rowNum = index + 1;
 
-      // Required fields validation
+      // Only validate Client Name and Guard Name as required (essential for payroll)
       if (!row.clientName) {
-        errors.push(`Row ${rowNum}: Client Name is required`);
+        warnings.push(`Row ${rowNum}: Client Name is empty`);
       }
       if (!row.guardName) {
-        errors.push(`Row ${rowNum}: Guard Name is required`);
-      }
-      if (!row.accountNo) {
-        errors.push(`Row ${rowNum}: Account No is required`);
-      }
-      if (!row.sortCode) {
-        errors.push(`Row ${rowNum}: Sort Code is required`);
-      }
-      if (!row.accountHolderName) {
-        errors.push(`Row ${rowNum}: Account Holder Name is required`);
+        warnings.push(`Row ${rowNum}: Guard Name is empty`);
       }
 
-      // Numeric fields validation
+      // Numeric fields validation - only warn if negative
       if (row.totalHours < 0) {
-        errors.push(`Row ${rowNum}: Total Hours cannot be negative`);
+        warnings.push(`Row ${rowNum}: Total Hours cannot be negative`);
       }
       if (row.payRate < 0) {
-        errors.push(`Row ${rowNum}: Pay Rate cannot be negative`);
+        warnings.push(`Row ${rowNum}: Pay Rate cannot be negative`);
       }
       if (row.chargeRate < 0) {
-        errors.push(`Row ${rowNum}: Charge Rate cannot be negative`);
+        warnings.push(`Row ${rowNum}: Charge Rate cannot be negative`);
       }
       if (row.pay1 < 0) {
-        errors.push(`Row ${rowNum}: Pay 1 cannot be negative`);
+        warnings.push(`Row ${rowNum}: Pay 1 cannot be negative`);
       }
       if (row.pay2 < 0) {
-        errors.push(`Row ${rowNum}: Pay 2 cannot be negative`);
+        warnings.push(`Row ${rowNum}: Pay 2 cannot be negative`);
       }
       if (row.pay3 < 0) {
-        errors.push(`Row ${rowNum}: Pay 3 cannot be negative`);
+        warnings.push(`Row ${rowNum}: Pay 3 cannot be negative`);
       }
 
-      // Warnings
+      // Warnings only for data quality
       if (row.totalHours === 0) {
         warnings.push(`Row ${rowNum}: Total Hours is 0`);
       }
       if (row.payRate === 0) {
         warnings.push(`Row ${rowNum}: Pay Rate is 0`);
-      }
-
-      // Sort code format validation (typically NNNNNN format)
-      if (!/^\d{6}$|^\d{2}-\d{2}-\d{2}$/.test(row.sortCode.replace(/\s/g, ''))) {
-        warnings.push(`Row ${rowNum}: Sort Code format may be incorrect`);
-      }
-
-      // Account number validation (should be numbers)
-      if (!/^\d+$/.test(row.accountNo.replace(/\s/g, ''))) {
-        warnings.push(`Row ${rowNum}: Account No should contain only numbers`);
       }
     });
 

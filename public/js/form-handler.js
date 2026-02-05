@@ -63,6 +63,43 @@ function calculateTotalPay() {
   if (totalPayDisplay) {
     totalPayDisplay.textContent = '£' + totalPay.toFixed(2);
   }
+
+  // Update pay distribution
+  updatePayDistribution();
+}
+
+/**
+ * Update pay distribution between primary and associated guard
+ */
+function updatePayDistribution() {
+  const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+  const totalMinutes = parseFloat(document.getElementById('totalMinutes').value) || 0;
+  const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+  const payRate = parseFloat(document.getElementById('payRate').value) || 0;
+  const associatedPayRate = parseFloat(document.getElementById('associatedGuardPayRate').value) || 0;
+
+  const totalHoursDecimal = totalHours + (totalMinutes / 60);
+  const primaryHours = totalHoursDecimal - associatedHours;
+  
+  const primaryPay = primaryHours * payRate;
+  const associatedPay = associatedHours * associatedPayRate;
+  const totalPay = primaryPay + associatedPay;
+
+  // Update display elements if they exist
+  const primaryPayDisplay = document.getElementById('primaryGuardPayDisplay');
+  if (primaryPayDisplay) primaryPayDisplay.textContent = '£' + primaryPay.toFixed(2);
+
+  const associatedPayDisplay = document.getElementById('associatedGuardPayDisplay');
+  if (associatedPayDisplay) associatedPayDisplay.textContent = '£' + associatedPay.toFixed(2);
+
+  const primaryHoursDisplay = document.getElementById('primaryGuardHoursDisplay');
+  if (primaryHoursDisplay) primaryHoursDisplay.textContent = primaryHours.toFixed(1) + 'h';
+
+  const associatedHoursDisplay = document.getElementById('associatedGuardHoursDisplay');
+  if (associatedHoursDisplay) associatedHoursDisplay.textContent = associatedHours.toFixed(1) + 'h';
+
+  const totalPaySummary = document.getElementById('totalPaySummary');
+  if (totalPaySummary) totalPaySummary.textContent = '£' + totalPay.toFixed(2);
 }
 
 // ============================================================================

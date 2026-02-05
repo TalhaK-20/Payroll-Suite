@@ -543,23 +543,57 @@ async function handleFormSubmit(e) {
   e.preventDefault();
 
   const formData = new FormData(e.target);
+  
+  // Get raw values
+  const totalHours = parseFloat(formData.get('totalHours') || 0);
+  const associatedGuardHours = parseFloat(formData.get('associatedGuardHours') || 0);
+  const primaryGuardHours = Math.max(0, totalHours - associatedGuardHours);
+
   const data = {
+    clientId: formData.get('clientId') || null,
     clientName: formData.get('clientName'),
     guardName: formData.get('guardName'),
-    totalHours: parseFloat(formData.get('totalHours')),
-    payRate: parseFloat(formData.get('payRate')),
-    chargeRate: parseFloat(formData.get('chargeRate')),
-    pay1: parseFloat(formData.get('pay1')),
-    pay2: parseFloat(formData.get('pay2')),
-    pay3: parseFloat(formData.get('pay3')),
-    accountNo: formData.get('accountNo'),
-    sortCode: formData.get('sortCode'),
-    accountHolderName: formData.get('accountHolderName')
+    guardId: formData.get('guardId') || null,
+    nationality: formData.get('nationality'),
+    siteName: formData.get('siteName') || '',
+    insuranceNumber: formData.get('insuranceNumber') || '',
+    visaStatus: formData.get('visaStatus') || '',
+    britishPassport: formData.get('britishPassport') === 'on',
+    shareCode: formData.get('shareCode') || null,
+    shareCodeExpiryDate: formData.get('shareCodeExpiryDate') || null,
+    totalHours: totalHours,
+    totalMinutes: parseInt(formData.get('totalMinutes') || 0),
+    payRate: parseFloat(formData.get('payRate') || 0),
+    chargeRate: parseFloat(formData.get('chargeRate') || 0),
+    pay1: parseFloat(formData.get('pay1') || 0),
+    pay2: parseFloat(formData.get('pay2') || 0),
+    pay3: parseFloat(formData.get('pay3') || 0),
+    accountNo: formData.get('accountNo') || '',
+    sortCode: formData.get('sortCode') || '',
+    accountHolderName: formData.get('accountHolderName') || '',
+    bankAccountId: formData.get('bankAccountId') || null,
+    
+    // Proper nesting for hoursDistribution
+    hoursDistribution: {
+      primaryGuardHours: primaryGuardHours,
+      associatedGuardHours: associatedGuardHours,
+      associatedGuardId: formData.get('associatedGuardId') || null,
+      associatedGuardName: formData.get('associatedGuardName') || ''
+    },
+    
+    // Status field
+    status: formData.get('status') || 'pending',
+    
+    // Legacy fields for backward compatibility
+    associatedGuardPayRate: parseFloat(formData.get('associatedGuardPayRate') || 0),
+    associatedGuardPay: parseFloat(formData.get('associatedGuardPay') || 0)
   };
 
   const id = formData.get('id');
   const method = id ? 'PUT' : 'POST';
   const url = id ? `/api/payroll/${id}` : '/api/payroll';
+
+  console.log('Form Submit Data:', data);
 
   try {
     const response = await fetch(url, {
@@ -575,15 +609,19 @@ async function handleFormSubmit(e) {
     if (result.success) {
       showAlert(result.message, 'success');
       document.getElementById('payrollForm').reset();
+      document.getElementById('formModalTitle').textContent = 'Add New Payroll Record';
       loadPayrollData();
+      if (typeof loadPayrollRecords === 'function') loadPayrollRecords();
+      if (typeof loadMetrics === 'function') loadMetrics();
       const modal = document.getElementById('formModal');
       if (modal) modal.classList.remove('active');
     } else {
       showAlert(result.message || 'Error saving record', 'danger');
+      console.error('Form submission error:', result);
     }
   } catch (error) {
     console.error('Error:', error);
-    showAlert('Error saving record', 'danger');
+    showAlert('Error saving record: ' + error.message, 'danger');
   }
 }
 
@@ -591,6 +629,11 @@ function openAddForm() {
   document.getElementById('payrollForm').reset();
   document.getElementById('formModalTitle').textContent = 'Add New Payroll Record';
   document.getElementById('formModal').classList.add('active');
+  
+  // Load guards, bank accounts, and clients dropdowns when opening form
+  loadClientsForForm();
+  loadGuardsForForm();
+  loadBankAccountsForForm();
 }
 
 async function generatePayrollPDF(id, payNumber, guardName) {
@@ -604,6 +647,8 @@ async function generatePayrollPDF(id, payNumber, guardName) {
     
     const payrollResponse = await fetchResponse.json();
     const payrollData = payrollResponse.data;
+    
+    console.log('Payroll Data for PDF:', payrollData);
     
     // Then generate the PDF with the full payroll data
     const response = await fetch(`/api/payroll/generate-pdf`, {
@@ -1101,4 +1146,88 @@ function debounce(func, wait) {
     clearTimeout(timeout);
     timeout = setTimeout(later, wait);
   };
+}
+// ==================== DROPDOWN LOADING FUNCTIONS ====================
+
+async function loadGuardsForForm() {
+  try {
+    const response = await fetch('/api/guards');
+    const result = await response.json();
+
+    if (result.success) {
+      const dropdown = document.getElementById('guardId');
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">Select Guard</option>' +
+          result.data.map(guard => `
+            <option value="${guard._id}" data-guard-name="${guard.guardName}" data-nationality="${guard.nationality}">${guard.guardName}</option>
+          `).join('');
+      }
+    }
+  } catch (error) {
+    console.error('Error loading guards:', error);
+  }
+}
+
+async function loadBankAccountsForForm() {
+  try {
+    const response = await fetch('/api/bank-accounts');
+    const result = await response.json();
+
+    if (result.success) {
+      const dropdown = document.getElementById('bankAccountId');
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">Select Bank Account</option>' +
+          result.data.map(account => `
+            <option value="${account._id}" data-account-number="${account.accountNumber}" data-sort-code="${account.sortCode}" data-holder="${account.accountHolderName}">
+              ${account.accountHolderName} - ${account.bankName}
+            </option>
+          `).join('');
+      }
+    }
+  } catch (error) {
+    console.error('Error loading bank accounts:', error);
+  }
+}
+
+async function loadClientsForForm() {
+  try {
+    const response = await fetch('/api/clients');
+    const result = await response.json();
+
+    if (result.success) {
+      const dropdown = document.getElementById('clientId');
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">Select Client</option>' +
+          result.data.map(client => `
+            <option value="${client._id}" data-client-name="${client.name}">${client.name}</option>
+          `).join('');
+      }
+    }
+  } catch (error) {
+    console.error('Error loading clients:', error);
+  }
+}
+
+function updateGuardDetailsForm() {
+  const guardId = document.getElementById('guardId').value;
+  const selected = document.querySelector(`#guardId option[value="${guardId}"]`);
+  if (selected) {
+    document.getElementById('guardName').value = selected.dataset.guardName;
+  } else {
+    document.getElementById('guardName').value = '';
+  }
+}
+
+function updateBankAccountFieldsForm() {
+  const bankId = document.getElementById('bankAccountId').value;
+  const selected = document.querySelector(`#bankAccountId option[value="${bankId}"]`);
+  if (selected) {
+    document.getElementById('accountNo').value = selected.dataset.accountNumber;
+    document.getElementById('sortCode').value = selected.dataset.sortCode;
+    document.getElementById('accountHolderName').value = selected.dataset.holder;
+  } else {
+    document.getElementById('accountNo').value = '';
+    document.getElementById('sortCode').value = '';
+    document.getElementById('accountHolderName').value = '';
+  }
 }

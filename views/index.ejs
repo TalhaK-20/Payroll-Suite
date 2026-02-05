@@ -6,23 +6,487 @@
   <title>Payroll Management System</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/png" href="/images/salary.png">
+  <style>
+    /* Global Header Styles */
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+    }
+
+    header .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: white;
+    }
+
+    header .header-brand img {
+      width: 50px;
+      height: 50px;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
+    }
+
+    header .header-brand h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header nav ul {
+      display: flex;
+      list-style: none;
+      gap: 2rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    header nav a {
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    header nav a:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    header nav a::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: white;
+      transition: width 0.3s ease;
+    }
+
+    header nav a:hover::after {
+      width: 100%;
+    }
+
+    /* Home Hero Section */
+    .hero-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+      margin-bottom: 3rem;
+      border-radius: 15px;
+    }
+
+    .hero-section h2 {
+      font-size: 2.5rem;
+      margin: 0 0 1rem 0;
+      font-weight: 700;
+    }
+
+    .hero-section p {
+      font-size: 1.2rem;
+      opacity: 0.95;
+      margin: 0 0 2rem 0;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .hero-actions .btn {
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .hero-actions .btn-primary {
+      background: white;
+      color: #667eea;
+    }
+
+    .hero-actions .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .hero-actions .btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid white;
+    }
+
+    .hero-actions .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* Pay Distribution Box */
+    .pay-distribution-box {
+      background: linear-gradient(135deg, #f5f7fa 0%, #e9ecf1 100%);
+      border: 2px solid #d0d8e8;
+      border-radius: 10px;
+      padding: 2rem;
+      margin: 1rem 0;
+    }
+
+    .pay-dist-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      gap: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .pay-dist-item {
+      text-align: center;
+      flex: 1;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+
+    .pay-dist-item:hover {
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .pay-dist-label {
+      display: block;
+      font-size: 0.9rem;
+      color: #666;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pay-dist-amount {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #667eea;
+      margin: 0.5rem 0;
+      line-height: 1;
+    }
+
+    .pay-dist-hours {
+      display: block;
+      font-size: 0.85rem;
+      color: #999;
+      margin-top: 0.5rem;
+    }
+
+    .pay-dist-icon {
+      font-size: 1.5rem;
+      color: #aaa;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+
+    .metric-card {
+      background: white;
+      padding: 1.2rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .metric-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .metric-card.success::before {
+      background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%);
+    }
+
+    .metric-card.warning::before {
+      background: linear-gradient(90deg, #f39c12 0%, #e67e22 100%);
+    }
+
+    .metric-card.danger::before {
+      background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: #888;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #667eea;
+      margin: 0.3rem 0;
+    }
+
+    .metric-card.success .metric-value {
+      color: #27ae60;
+    }
+
+    .metric-card.warning .metric-value {
+      color: #f39c12;
+    }
+
+    .metric-card.danger .metric-value {
+      color: #e74c3c;
+    }
+
+    .metric-unit {
+      font-size: 0.7rem;
+      color: #aaa;
+      font-weight: 400;
+    }
+
+    /* Quick Actions */
+    .quick-actions-section {
+      margin: 3rem 0;
+    }
+
+    .quick-actions-section h3 {
+      font-size: 1.5rem;
+      color: #333;
+      margin-bottom: 1.5rem;
+      font-weight: 700;
+    }
+
+    /* Payroll Records Section */
+    .payroll-section {
+      margin: 3rem 0;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .payroll-section h3 {
+      font-size: 1.3rem;
+      color: #333;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-weight: 700;
+    }
+
+    .payroll-records-container {
+      overflow-x: auto;
+    }
+
+    .payroll-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .payroll-table thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .payroll-table th {
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .payroll-table td {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .payroll-table tbody tr:hover {
+      opacity: 0.95;
+    }
+
+    .payroll-table tbody tr:nth-child(even) {
+      background-color: inherit;
+    }
+
+    /* Action Buttons in Payroll Table */
+    .action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      margin: 0 0.3rem;
+      padding: 0.3rem 0.5rem;
+      transition: transform 0.2s ease;
+    }
+
+    .action-btn:hover {
+      transform: scale(1.3);
+    }
+
+    .action-btn.edit-btn:hover {
+      color: #667eea;
+    }
+
+    .action-btn.pdf-btn:hover {
+      color: #764ba2;
+    }
+
+    .action-btn.delete-btn:hover {
+      color: #dc3545;
+    }
+
+    /* Calendar Section */
+    .calendar-section {
+      margin: 3rem 0;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .calendar-section h3 {
+      font-size: 1.3rem;
+      color: #333;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-weight: 700;
+    }
+
+    .calendar-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.5rem;
+    }
+
+    .calendar-day {
+      aspect-ratio: 1;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 0.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .calendar-day:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    .calendar-day.has-records {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+      font-weight: 600;
+    }
+
+    .calendar-day.today {
+      border: 2px solid #f39c12;
+      font-weight: bold;
+    }
+
+    .calendar-day.other-month {
+      color: #ccc;
+      background: #f9f9f9;
+    }
+
+    .calendar-day-num {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .calendar-day-count {
+      font-size: 0.7rem;
+      line-height: 1.2;
+    }
+
+    @media (max-width: 768px) {
+      header nav ul {
+        gap: 1rem;
+        font-size: 0.9rem;
+      }
+
+      header .header-brand h1 {
+        font-size: 1.4rem;
+      }
+
+      .hero-section h2 {
+        font-size: 1.8rem;
+      }
+
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <header>
     <div class="container">
       <div class="header-brand">
         <img src="/images/salary.png" alt="Payroll Logo" class="logo">
-        <h1>Payroll Management System</h1>
+        <h1>💼 Payroll Pro</h1>
       </div>
       <nav>
         <ul>
-          <li><a href="/">Dashboard</a></li>
-          <li><a href="/guards">Guards</a></li>
-          <li><a href="/monthly-hours">Monthly Hours</a></li>
-          <li><a href="/dashboard">Metrics</a></li>
-          <li><a href="/reports">Reports</a></li>
-          <li><a href="/upload">Upload Excel</a></li>
-          <li><a href="#" onclick="openAddForm(); return false;">Add Record</a></li>
+          <li><a href="/">🏠 Home</a></li>
+          <li><a href="/guards">👥 Guards</a></li>
+          <li><a href="/clients">🏢 Clients</a></li>
+          <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
+          <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/upload">📤 Upload</a></li>
         </ul>
       </nav>
     </div>
@@ -33,179 +497,96 @@
       <!-- Alerts -->
       <div id="alertContainer"></div>
 
-      <!-- Page Header -->
-      <div class="page-header">
-        <h2>Payroll Dashboard</h2>
-        <p>Manage and track all payroll records efficiently</p>
-      </div>
-
-      <!-- Export Section -->
-      <div class="export-section">
-        <div class="export-title">📊 Export Data</div>
-        <div class="export-buttons">
-          <button id="exportPDF" class="btn btn-secondary">
-            📄 Export to PDF
-          </button>
-          <button id="exportExcel" class="btn btn-success">
-            📑 Export to Excel
-          </button>
-          <button onclick="openAddForm()" class="btn btn-primary">
-            ➕ Add New Record
-          </button>
+      <!-- Hero Section -->
+      <div class="hero-section">
+        <h2>Welcome to Payroll Pro ✨</h2>
+        <p>Manage guards, track hours, and process payroll with ease</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="openAddForm()">➕ Add New Record</button>
+          <button class="btn btn-secondary" onclick="document.location.href='/upload'">📤 Upload Excel</button>
         </div>
       </div>
 
-      <!-- Filter Section -->
-      <div class="filter-section">
-        <div class="filter-title">🔍 Advanced Filters</div>
-        <div class="filter-grid">
-          <div class="filter-input">
-            <label>Guard Name</label>
-            <input type="text" id="filterGuard" placeholder="Search by guard name">
-          </div>
-          <div class="filter-input">
-            <label>Insurance Number</label>
-            <input type="text" id="filterInsurance" placeholder="Search by insurance no">
-          </div>
-          <div class="filter-input">
-            <label>Visa Status</label>
-            <select id="filterVisa">
-              <option value="">-- All Visa Status --</option>
-              <option value="Student">Student</option>
-              <option value="Skilled Worker">Skilled Worker</option>
-              <option value="PSW">PSW</option>
-              <option value="Dependent/Spouse">Dependent/Spouse</option>
-              <option value="Permanent Resident">Permanent Resident</option>
-              <option value="Settled Status">Settled Status</option>
-              <option value="Pre-Settled Status">Pre-Settled Status</option>
-              <option value="Refugee/Asylum">Refugee/Asylum</option>
-            </select>
-          </div>
-          <div class="filter-input">
-            <label>Nationality</label>
-            <input type="text" id="filterNationality" placeholder="Search by nationality">
-          </div>
+      <!-- Metrics Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Total Guards</div>
+          <div class="metric-value" id="totalGuards">0</div>
+          <div class="metric-unit">Active Guards</div>
         </div>
-        <div class="filter-actions">
-          <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
-          <button id="resetFilters" class="btn btn-secondary">Reset</button>
+
+        <div class="metric-card success">
+          <div class="metric-label">Hours This Month</div>
+          <div class="metric-value"><span id="totalHoursValue">0</span>h</div>
+          <div class="metric-unit"><span id="totalMinutesValue">0</span> minutes</div>
+        </div>
+
+        <div class="metric-card success">
+          <div class="metric-label">Hours Paid</div>
+          <div class="metric-value"><span id="paidHoursValue">0</span>h</div>
+          <div class="metric-unit"><span id="paidMinutesValue">0</span> minutes</div>
+        </div>
+
+        <div class="metric-card success">
+          <div class="metric-label">Total Hours Added (Today)</div>
+          <div class="metric-value"><span id="totalHoursAdded">0</span>h</div>
+          <div class="metric-unit"><span id="totalHoursAddedMinutes">0</span> minutes</div>
+        </div>
+
+        <div class="metric-card warning">
+          <div class="metric-label">Hours Remaining</div>
+          <div class="metric-value"><span id="remainingHoursValue">0</span>h</div>
+          <div class="metric-unit"><span id="remainingMinutesValue">0</span> minutes</div>
+        </div>
+
+        <div class="metric-card warning">
+          <div class="metric-label">Pending Payrolls</div>
+          <div class="metric-value" id="pendingPayrolls">0</div>
+          <div class="metric-unit">To be processed</div>
+        </div>
+
+        <div class="metric-card danger">
+          <div class="metric-label">Expiring Alerts</div>
+          <div class="metric-value" id="expiringAlerts">0</div>
+          <div class="metric-unit">Share codes</div>
+        </div>
+      </div>
+      <!-- Recent Payroll Records -->
+      <div class="payroll-section">
+        <h3>📋 Recent Payroll Records</h3>
+        <div class="payroll-records-container">
+          <table class="payroll-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Guard Name</th>
+                <th>Client</th>
+                <th>Total Hours</th>
+                <th>Hours Spent</th>
+                <th>Remaining Hours</th>
+                <th>Associated Guard</th>
+                <th>Total Pay</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payrollRecordsBody">
+              <tr><td colspan="10" style="text-align: center; padding: 2rem;">Loading records...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <!-- View Toggle -->
-      <div class="view-toggle-section">
-        <div class="view-toggle-buttons">
-          <button id="toggleTableView" class="btn btn-toggle active" onclick="switchView('table')">
-            📋 Table View
-          </button>
-          <button id="toggleCardView" class="btn btn-toggle" onclick="switchView('card')">
-            📅 Card View
-          </button>
-          <button id="toggleCalendarView" class="btn btn-toggle" onclick="switchView('calendar')">
-            📆 Daily Hours Calendar
-          </button>
-        </div>
-      </div>
-
-      <!-- Payroll Table View -->
-      <div id="tableViewContainer" class="table-container view-container active">
-        <table>
-          <thead>
-            <tr>
-              <th>Guard Name</th>
-              <th>Client Name</th>
-              <th>Status</th>
-              <th>📄 Generate</th>
-              <th>⚙️ Manage</th>
-            </tr>
-          </thead>
-          <tbody id="payrollTableBody">
-            <tr>
-              <td colspan="5" class="text-center">
-                <div class="spinner">
-                  <div class="loading"></div>
-                  <span>Loading records...</span>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Payroll Card View -->
-      <div id="cardViewContainer" class="card-view-container view-container">
-        <div id="payrollCardGrid" class="payroll-card-grid">
-          <!-- Cards will be populated here -->
-        </div>
-      </div>
-
-      <!-- Daily Hours Calendar View -->
-      <div id="calendarViewContainer" class="calendar-view-container view-container">
+      <!-- Payroll Calendar -->
+      <div class="calendar-section">
+        <h3>📅 Payroll by Day</h3>
         <div class="calendar-controls">
-          <div class="calendar-selector">
-            <label>Select Guard: </label>
-            <select id="guardSelector" onchange="loadGuardCalendar()">
-              <option value="">-- Select a Guard --</option>
-            </select>
-          </div>
-          <div class="calendar-month-nav">
-            <button onclick="previousMonth()" class="btn btn-sm">◀ Previous</button>
-            <span id="currentMonth" class="current-month">Current Month</span>
-            <button onclick="nextMonth()" class="btn btn-sm">Next ▶</button>
-          </div>
+          <button onclick="previousCalendarMonth()" class="btn btn-sm">◀ Previous</button>
+          <span id="calendarMonthLabel" style="font-weight: bold; margin: 0 1rem;">Current Month</span>
+          <button onclick="nextCalendarMonth()" class="btn btn-sm">Next ▶</button>
         </div>
-        <div id="dailyHoursCalendar" class="daily-hours-calendar">
-          <!-- Calendar will be populated here -->
-        </div>
-      </div>
-
-      <!-- Daily Hours Modal -->
-      <div id="dailyHoursModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-          <div class="modal-header">
-            <h2>Log Daily Hours</h2>
-            <button class="modal-close" onclick="closeDailyHoursModal()">✕</button>
-          </div>
-          <div class="modal-body" style="padding: 2rem;">
-            <input type="hidden" id="dailyGuardId">
-            <input type="hidden" id="dailyDate">
-            
-            <div class="form-group">
-              <label>Guard Name</label>
-              <input type="text" id="dailyGuardName" readonly class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label>Date</label>
-              <input type="date" id="dailyLogDate" readonly class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label>Sign-In Time</label>
-              <input type="time" id="signInTime" class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label>Sign-Off Time</label>
-              <input type="time" id="signOffTime" class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label>Hours Worked (Auto-calculated)</label>
-              <input type="text" id="hoursWorked" readonly class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label>
-                <input type="checkbox" id="dutyCompleted">
-                Duty Completed (8+ hours)
-              </label>
-            </div>
-
-            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-              <button onclick="closeDailyHoursModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
-              <button onclick="saveDailyHours()" class="btn btn-primary" style="flex: 1;">Save</button>
-            </div>
-          </div>
+        <div class="calendar-grid" id="payrollCalendar">
+          <!-- Calendar will be populated by JavaScript -->
         </div>
       </div>
     </div>
@@ -233,16 +614,24 @@
           <h3 class="section-title">👤 Guard Basic Information</h3>
           <div class="form-row-2col">
             <div class="form-group">
-              <label>Guard Name <span class="required">*</span></label>
-              <input type="text" id="guardName" name="guardName" placeholder="e.g., John Smith" required>
-              <small class="field-hint">Employee's full name</small>
+              <label>Guard <span class="required">*</span></label>
+              <select id="guardId" name="guardId" required onchange="updateGuardDetailsIndex()">
+                <option value="">Select Guard</option>
+              </select>
+              <small class="field-hint">Select from available guards</small>
             </div>
             <div class="form-group">
               <label>Nationality <span class="required">*</span></label>
-              <input type="text" id="nationality" name="nationality" placeholder="e.g., British, Indian, Pakistani" required>
-              <small class="field-hint">Country of origin</small>
+              <input type="text" id="nationality" name="nationality" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-populated from guard selection</small>
             </div>
           </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Guard Name (Display)</label>
+              <input type="text" id="guardName" name="guardName" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-populated from selection</small>
+            </div>
           <div class="form-row-2col">
             <div class="form-group">
               <label>Insurance Number <span class="required">*</span></label>
@@ -308,8 +697,15 @@
           <div class="form-row-2col">
             <div class="form-group">
               <label>Client Name <span class="required">*</span></label>
-              <input type="text" id="clientName" name="clientName" placeholder="e.g., SES Security" required>
-              <small class="field-hint">Company/client name</small>
+              <select id="clientId" name="clientId" required onchange="updateClientNameIndex()">
+                <option value="">Select Client</option>
+              </select>
+              <small class="field-hint">Select from available clients</small>
+            </div>
+            <div class="form-group">
+              <label>Client Name (Display)</label>
+              <input type="text" id="clientName" name="clientName" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-populated from selection</small>
             </div>
           </div>
         </div>
@@ -320,13 +716,74 @@
           <div class="form-row-2col">
             <div class="form-group">
               <label>Total Hours <span class="required">*</span></label>
-              <input type="number" id="totalHours" name="totalHours" min="0" placeholder="e.g., 40" required onchange="calculateTotalPay()">
+              <input type="number" id="totalHours" name="totalHours" min="0" placeholder="e.g., 40" required onchange="calculateTotalPay(); updateTotalHoursDisplayIndex();">
               <small class="field-hint">Number of hours worked</small>
             </div>
             <div class="form-group">
               <label>Total Minutes <span class="required">*</span></label>
-              <input type="number" id="totalMinutes" name="totalMinutes" min="0" max="59" placeholder="e.g., 30" required onchange="calculateTotalPay()">
+              <input type="number" id="totalMinutes" name="totalMinutes" min="0" max="59" placeholder="e.g., 30" required onchange="calculateTotalPay();">
               <small class="field-hint">Minutes (0-59)</small>
+            </div>
+          </div>
+          <!-- Dynamic Total Hours Summary -->
+          <div class="form-group" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 5px; color: white; margin: 10px 0;">
+            <label style="color: white; margin-bottom: 5px; display: block;">📊 Total Hours Summary</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="padding: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; text-align: center;">
+                <small style="display: block; opacity: 0.9;">Primary Guard</small>
+                <strong id="primaryHoursSummaryIndex" style="font-size: 1.3em;">0.0</strong> hrs
+              </div>
+              <div style="padding: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; text-align: center;">
+                <small style="display: block; opacity: 0.9;">Associated Guard</small>
+                <strong id="associatedHoursSummaryIndex" style="font-size: 1.3em;">0.0</strong> hrs
+              </div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); text-align: center;">
+              <small style="display: block; opacity: 0.9;">Total Hours</small>
+              <strong id="totalHoursSummaryIndex" style="font-size: 1.5em;">0.0</strong> hrs
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4A: Associated Guard -->
+        <div class="form-section">
+          <h3 class="section-title">👥 Associated Guard (Optional)</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Associated Guard</label>
+              <select id="associatedGuardId" name="associatedGuardId" onchange="updateAssociatedGuardNameIndex(); updateTotalHoursDisplayIndex();">
+                <option value="">None</option>
+              </select>
+              <small class="field-hint">Assign hours to another guard</small>
+            </div>
+            <div class="form-group">
+              <label>Associated Guard Name</label>
+              <input type="text" id="associatedGuardName" name="associatedGuardName" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-populated from selection</small>
+            </div>
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Hours to Transfer (Optional)</label>
+              <input type="number" id="associatedGuardHours" name="associatedGuardHours" step="0.5" min="0" onchange="updatePrimaryGuardHoursIndex(); updateTotalHoursDisplayIndex(); updatePayDistribution();">
+              <small class="field-hint">Hours for associated guard</small>
+            </div>
+            <div class="form-group">
+              <label>Associated Guard Pay Rate (£/hour)</label>
+              <input type="number" id="associatedGuardPayRate" name="associatedGuardPayRate" step="0.01" min="0" onchange="updateAssociatedGuardPayIndex(); updatePayDistribution();">
+              <small class="field-hint">Hourly rate for associated guard</small>
+            </div>
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Associated Guard Total Pay (£)</label>
+              <input type="number" id="associatedGuardPay" name="associatedGuardPay" step="0.01" min="0" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-calculated</small>
+            </div>
+            <div class="form-group">
+              <label>Primary Guard Hours</label>
+              <input type="number" id="primaryGuardHours" name="primaryGuardHours" step="0.5" min="0" readonly style="background-color: #f5f5f5;">
+              <small class="field-hint">Auto-calculated (Total - Associated)</small>
             </div>
           </div>
         </div>
@@ -350,6 +807,29 @@
             <p style="background: #f0f4ff; padding: 10px; border-radius: 5px; margin: 10px 0;">
               <strong>Calculated Total Pay:</strong> <span id="totalPayDisplay">£0.00</span>
             </p>
+          </div>
+        </div>
+
+        <!-- SECTION 5.5: Pay Distribution -->
+        <div class="form-section">
+          <h3 class="section-title">💰 Pay Distribution</h3>
+          <div class="pay-distribution-box">
+            <div class="pay-dist-row">
+              <div class="pay-dist-item">
+                <label class="pay-dist-label">Primary Guard</label>
+                <div class="pay-dist-amount" id="primaryGuardPayDisplay">£0.00</div>
+                <span class="pay-dist-hours" id="primaryGuardHoursDisplay">0h</span>
+              </div>
+              <div class="pay-dist-icon">↔️</div>
+              <div class="pay-dist-item">
+                <label class="pay-dist-label">Associated Guard</label>
+                <div class="pay-dist-amount" id="associatedGuardPayDisplay">£0.00</div>
+                <span class="pay-dist-hours" id="associatedGuardHoursDisplay">0h</span>
+              </div>
+            </div>
+            <div style="text-align: center; margin-top: 1rem; padding: 1rem; background: #fffbf0; border-radius: 5px;">
+              <strong>Total Pay:</strong> <span id="totalPaySummary">£0.00</span>
+            </div>
           </div>
         </div>
 
@@ -401,5 +881,456 @@
 
   <script src="/js/main.js"></script>
   <script src="/js/form-handler.js"></script>
+  <script>
+    let guardsDataIndex = [];
+    let clientsDataIndex = [];
+    let bankAccountsDataIndex = [];
+
+    // Load data when modal is opened
+    document.addEventListener('DOMContentLoaded', () => {
+      // Hook to modal open
+      const formModal = document.getElementById('formModal');
+      if (formModal) {
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class' && formModal.classList.contains('active')) {
+              loadGuardsDropdownIndex();
+              loadClientsDropdownIndex();
+              loadBankAccountsDropdownIndex();
+            }
+          });
+        });
+        observer.observe(formModal, { attributes: true });
+      }
+    });
+
+    async function loadGuardsDropdownIndex() {
+      try {
+        const response = await fetch('/api/guards');
+        const result = await response.json();
+        if (result.success) {
+          guardsDataIndex = result.data;
+          const dropdown = document.getElementById('guardId');
+          if (dropdown) {
+            dropdown.innerHTML = '<option value="">Select Guard</option>' +
+              result.data.map(guard => `
+                <option value="${guard._id}" data-guard-name="${guard.guardName}" data-nationality="${guard.nationality}">${guard.guardName}</option>
+              `).join('');
+            loadAssociatedGuardsDropdownIndex();
+          }
+        }
+      } catch (error) {
+        console.error('Error loading guards:', error);
+      }
+    }
+
+    async function loadClientsDropdownIndex() {
+      try {
+        const response = await fetch('/api/clients');
+        const result = await response.json();
+        if (result.success) {
+          clientsDataIndex = result.data;
+          const dropdown = document.getElementById('clientId');
+          if (dropdown) {
+            dropdown.innerHTML = '<option value="">Select Client</option>' +
+              result.data.map(client => `
+                <option value="${client._id}" data-client-name="${client.name}">${client.name}</option>
+              `).join('');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading clients:', error);
+      }
+    }
+
+    async function loadBankAccountsDropdownIndex() {
+      try {
+        const response = await fetch('/api/bank-accounts');
+        const result = await response.json();
+        if (result.success) {
+          bankAccountsDataIndex = result.data;
+        }
+      } catch (error) {
+        console.error('Error loading bank accounts:', error);
+      }
+    }
+
+    function loadAssociatedGuardsDropdownIndex() {
+      const dropdown = document.getElementById('associatedGuardId');
+      const currentGuardId = document.getElementById('guardId').value;
+      if (dropdown && guardsDataIndex.length > 0) {
+        dropdown.innerHTML = '<option value="">None</option>' +
+          guardsDataIndex
+            .filter(guard => guard._id !== currentGuardId)
+            .map(guard => `
+              <option value="${guard._id}" data-guard-name="${guard.guardName}">${guard.guardName}</option>
+            `).join('');
+      }
+    }
+
+    function updateGuardDetailsIndex() {
+      const guardId = document.getElementById('guardId').value;
+      const selected = document.querySelector(`#guardId option[value="${guardId}"]`);
+      if (selected) {
+        document.getElementById('guardName').value = selected.dataset.guardName;
+        document.getElementById('nationality').value = selected.dataset.nationality;
+        document.getElementById('associatedGuardId').value = '';
+        document.getElementById('associatedGuardName').value = '';
+        document.getElementById('associatedGuardHours').value = '';
+        document.getElementById('primaryGuardHours').value = '';
+        loadAssociatedGuardsDropdownIndex();
+      } else {
+        document.getElementById('guardName').value = '';
+        document.getElementById('nationality').value = '';
+      }
+    }
+
+    function updateClientNameIndex() {
+      const clientId = document.getElementById('clientId').value;
+      const selected = document.querySelector(`#clientId option[value="${clientId}"]`);
+      if (selected) {
+        document.getElementById('clientName').value = selected.dataset.clientName;
+      } else {
+        document.getElementById('clientName').value = '';
+      }
+    }
+
+    function updateAssociatedGuardNameIndex() {
+      const associatedId = document.getElementById('associatedGuardId').value;
+      const selected = document.querySelector(`#associatedGuardId option[value="${associatedId}"]`);
+      if (selected) {
+        document.getElementById('associatedGuardName').value = selected.dataset.guardName;
+      } else {
+        document.getElementById('associatedGuardName').value = '';
+      }
+    }
+
+    function updatePrimaryGuardHoursIndex() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const primaryHours = totalHours - associatedHours;
+      document.getElementById('primaryGuardHours').value = primaryHours > 0 ? primaryHours.toFixed(2) : 0;
+      updateAssociatedGuardPayIndex();
+    }
+
+    function updateAssociatedGuardPayIndex() {
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const associatedPayRate = parseFloat(document.getElementById('associatedGuardPayRate').value) || 0;
+      const totalPay = associatedHours * associatedPayRate;
+      document.getElementById('associatedGuardPay').value = totalPay.toFixed(2);
+    }
+
+    function updateTotalHoursDisplayIndex() {
+      const totalHours = parseFloat(document.getElementById('totalHours').value) || 0;
+      const associatedHours = parseFloat(document.getElementById('associatedGuardHours').value) || 0;
+      const primaryHours = Math.max(0, totalHours - associatedHours);
+      
+      document.getElementById('totalHoursSummaryIndex').textContent = totalHours.toFixed(1);
+      document.getElementById('primaryHoursSummaryIndex').textContent = primaryHours.toFixed(1);
+      document.getElementById('associatedHoursSummaryIndex').textContent = associatedHours.toFixed(1);
+    }
+
+    // ============ PAYROLL RECORDS AND CALENDAR ============
+
+    let currentCalendarMonth = new Date();
+
+    function loadPayrollRecords() {
+      fetch('/api/payroll')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const records = data.data.slice(0, 10); // Show last 10 records
+            const tbody = document.getElementById('payrollRecordsBody');
+            
+            if (records.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #999;">No payroll records found</td></tr>';
+              return;
+            }
+
+            tbody.innerHTML = records.map(record => {
+              const date = new Date(record.createdAt).toLocaleDateString();
+              const associatedGuardName = record.hoursDistribution?.associatedGuardName || '-';
+              const associatedGuardHours = record.hoursDistribution?.associatedGuardHours || 0;
+              const primaryGuardHours = record.hoursDistribution?.primaryGuardHours || 0;
+              const totalHoursDecimal = record.totalHours + (record.totalMinutes / 60);
+              const hoursSpent = primaryGuardHours + associatedGuardHours;
+              const remainingHours = totalHoursDecimal - hoursSpent;
+              const totalPay = (totalHoursDecimal * (record.payRate || 0)).toFixed(2);
+              const status = record.status || 'pending';
+              
+              // Color coding based on status
+              let statusColor, statusText, rowBackgroundColor;
+              if (status === 'completed') {
+                statusColor = '#28a745';
+                statusText = '✓ Completed';
+                rowBackgroundColor = '#e8f5e9';
+              } else if (status === 'ongoing') {
+                statusColor = '#ffc107';
+                statusText = '⟳ Ongoing';
+                rowBackgroundColor = '#fff9c4';
+              } else {
+                statusColor = '#dc3545';
+                statusText = '⊘ Pending';
+                rowBackgroundColor = '#ffebee';
+              }
+              
+              return `
+                <tr style="background-color: ${rowBackgroundColor};">
+                  <td>${date}</td>
+                  <td><strong>${record.guardName || '-'}</strong></td>
+                  <td>${record.clientName || '-'}</td>
+                  <td>${totalHoursDecimal.toFixed(2)}h</td>
+                  <td>${hoursSpent.toFixed(2)}h</td>
+                  <td>${remainingHours.toFixed(2)}h</td>
+                  <td>${associatedGuardName}</td>
+                  <td>£${totalPay}</td>
+                  <td><span style="background: ${statusColor}; color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">${statusText}</span></td>
+                  <td>
+                    <button class="action-btn edit-btn" onclick="editPayroll('${record._id}')" title="Edit">✏️</button>
+                    <button class="action-btn pdf-btn" onclick="downloadPayrollPDF('${record._id}')" title="Download PDF">📄</button>
+                    <button class="action-btn delete-btn" onclick="deletePayroll('${record._id}')" title="Delete">🗑️</button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        })
+        .catch(error => {
+          console.error('Error loading payroll records:', error);
+          const tbody = document.getElementById('payrollRecordsBody');
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #999;">Error loading records</td></tr>';
+        });
+    }
+
+    function renderPayrollCalendar() {
+      fetch('/api/payroll')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const records = data.data;
+            const year = currentCalendarMonth.getFullYear();
+            const month = currentCalendarMonth.getMonth();
+
+            // Count records by date
+            const recordsByDate = {};
+            records.forEach(record => {
+              const recordDate = new Date(record.createdAt);
+              if (recordDate.getFullYear() === year && recordDate.getMonth() === month) {
+                const day = recordDate.getDate();
+                recordsByDate[day] = (recordsByDate[day] || 0) + 1;
+              }
+            });
+
+            // Render calendar
+            const monthLabel = currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('calendarMonthLabel').textContent = monthLabel;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayOfWeek = firstDay.getDay();
+
+            let html = '';
+            const today = new Date();
+            const todayDate = today.getDate();
+            const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
+
+            // Empty cells for days before month starts
+            for (let i = 0; i < startingDayOfWeek; i++) {
+              html += '<div class="calendar-day other-month"></div>';
+            }
+
+            // Days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+              const hasRecords = recordsByDate[day] || 0;
+              const isTodayClass = isThisMonth && day === todayDate ? 'today' : '';
+              const hasRecordsClass = hasRecords > 0 ? 'has-records' : '';
+              
+              html += `
+                <div class="calendar-day ${isTodayClass} ${hasRecordsClass}">
+                  <div class="calendar-day-num">${day}</div>
+                  ${hasRecords > 0 ? `<div class="calendar-day-count">${hasRecords} record${hasRecords > 1 ? 's' : ''}</div>` : ''}
+                </div>
+              `;
+            }
+
+            document.getElementById('payrollCalendar').innerHTML = html;
+          }
+        })
+        .catch(error => console.error('Error rendering calendar:', error));
+    }
+
+    function previousCalendarMonth() {
+      currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() - 1, 1);
+      renderPayrollCalendar();
+    }
+
+    function nextCalendarMonth() {
+      currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + 1, 1);
+      renderPayrollCalendar();
+    }
+
+    // Load data on page load
+    function loadMetrics() {
+      // Load total guards
+      fetch('/api/guards')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const activeGuards = data.data.filter(g => g.active).length;
+            document.getElementById('totalGuards').textContent = activeGuards;
+          }
+        })
+        .catch(error => console.error('Error loading guards:', error));
+
+      // Load payroll metrics
+      fetch('/api/payroll')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const records = data.data;
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+
+            let totalHours = 0;
+            let totalMinutes = 0;
+            let paidHours = 0;
+            let paidMinutes = 0;
+            let todayHours = 0;
+            let todayMinutes = 0;
+            let pendingCount = 0;
+            let expiringAlerts = 0;
+
+            records.forEach(record => {
+              const recordDate = new Date(record.createdAt);
+              
+              // Count this month's records
+              if (recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear) {
+                totalHours += record.totalHours || 0;
+                totalMinutes += record.totalMinutes || 0;
+                
+                // Count paid hours (hours spent)
+                if (record.hoursDistribution) {
+                  paidHours += (record.hoursDistribution.primaryGuardHours || 0);
+                  paidHours += (record.hoursDistribution.associatedGuardHours || 0);
+                }
+              }
+
+              // Count today's records
+              if (recordDate.toDateString() === today.toDateString()) {
+                todayHours += record.totalHours || 0;
+                todayMinutes += record.totalMinutes || 0;
+              }
+
+              // Count pending payrolls
+              if (record.status === 'pending') {
+                pendingCount++;
+              }
+
+              // Count expiring share codes
+              if (record.shareCodeExpiryDate) {
+                const expiryDate = new Date(record.shareCodeExpiryDate);
+                const daysUntilExpiry = Math.floor((expiryDate - today) / (1000 * 60 * 60 * 24));
+                if (daysUntilExpiry >= 0 && daysUntilExpiry <= 30) {
+                  expiringAlerts++;
+                }
+              }
+            });
+
+            // Convert total minutes to hours
+            totalHours += Math.floor(totalMinutes / 60);
+            totalMinutes = totalMinutes % 60;
+
+            todayHours += Math.floor(todayMinutes / 60);
+            todayMinutes = todayMinutes % 60;
+
+            // Update metric boxes
+            document.getElementById('totalHoursValue').textContent = totalHours;
+            document.getElementById('totalMinutesValue').textContent = totalMinutes;
+            document.getElementById('paidHoursValue').textContent = Math.floor(paidHours);
+            document.getElementById('paidMinutesValue').textContent = Math.floor((paidHours % 1) * 60);
+            document.getElementById('totalHoursAdded').textContent = todayHours;
+            document.getElementById('totalHoursAddedMinutes').textContent = todayMinutes;
+            
+            const totalHoursDecimal = totalHours + (totalMinutes / 60);
+            const remainingHours = totalHoursDecimal - paidHours;
+            document.getElementById('remainingHoursValue').textContent = Math.floor(remainingHours);
+            document.getElementById('remainingMinutesValue').textContent = Math.floor((remainingHours % 1) * 60);
+            
+            document.getElementById('pendingPayrolls').textContent = pendingCount;
+            document.getElementById('expiringAlerts').textContent = expiringAlerts;
+          }
+        })
+        .catch(error => console.error('Error loading payroll metrics:', error));
+    }
+
+    function editPayroll(payrollId) {
+      // Fetch the payroll record
+      fetch(`/api/payroll/${payrollId}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const record = data.data;
+            
+            // Populate form with record data
+            document.getElementById('id').value = record._id;
+            document.getElementById('guardId').value = record.guardId || '';
+            document.getElementById('guardName').value = record.guardName || '';
+            document.getElementById('nationality').value = record.nationality || '';
+            document.getElementById('insuranceNumber').value = record.insuranceNumber || '';
+            document.getElementById('visaStatus').value = record.visaStatus || '';
+            document.getElementById('siteName').value = record.siteName || '';
+            document.getElementById('clientName').value = record.clientName || '';
+            document.getElementById('totalHours').value = record.totalHours || 0;
+            document.getElementById('totalMinutes').value = record.totalMinutes || 0;
+            document.getElementById('chargeRate').value = record.chargeRate || 0;
+            document.getElementById('payRate').value = record.payRate || 0;
+            
+            // Update title
+            document.getElementById('formModalTitle').textContent = 'Edit Payroll Record';
+            
+            // Open modal
+            openFormModal();
+          }
+        })
+        .catch(error => console.error('Error loading payroll record:', error));
+    }
+
+    function deletePayroll(payrollId) {
+      if (confirm('Are you sure you want to delete this payroll record? This action cannot be undone.')) {
+        fetch(`/api/payroll/${payrollId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('Payroll record deleted successfully');
+            loadPayrollRecords();
+          } else {
+            alert('Error deleting payroll record: ' + data.message);
+          }
+        })
+        .catch(error => {
+          console.error('Error deleting payroll record:', error);
+          alert('Error deleting payroll record');
+        });
+      }
+    }
+
+    function downloadPayrollPDF(payrollId) {
+      // Open PDF generation in new tab
+      window.open(`/api/payroll/generate-pdf/${payrollId}`, '_blank');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadMetrics();
+      loadPayrollRecords();
+      renderPayrollCalendar();
+    });
+  </script>
 </body>
 </html>

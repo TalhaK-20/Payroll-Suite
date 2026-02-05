@@ -5,7 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Payroll System</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/png" href="/images/salary.png">
   <style>
+    /* Global Header */
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: white;
+    }
+
+    header .header-brand img {
+      width: 40px;
+      height: 40px;
+    }
+
+    header .header-brand h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    header nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    header nav a {
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    header nav a:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    header nav a::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: white;
+      transition: width 0.3s ease;
+    }
+
+    header nav a:hover::after {
+      width: 100%;
+    }
     .dashboard-container {
       max-width: 1400px;
       margin: 0 auto;
@@ -389,6 +463,26 @@
   </style>
 </head>
 <body>
+  <!-- Global Header -->
+  <header>
+    <div class="container">
+      <div class="header-brand">
+        <img src="/images/salary.png" alt="Payroll Logo" class="logo">
+        <h1>💼 Payroll Pro</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="/">🏠 Home</a></li>
+          <li><a href="/guards">👥 Guards</a></li>
+          <li><a href="/clients">🏢 Clients</a></li>
+          <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
+          <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/upload">📤 Upload</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
   <div class="dashboard-container">
     <!-- Header -->
     <div class="dashboard-header">
@@ -408,6 +502,12 @@
         <div class="metric-label">Hours This Month</div>
         <div class="metric-value"><span id="totalHoursValue">0</span>h</div>
         <div class="metric-unit"><span id="totalMinutesValue">0</span> minutes</div>
+      </div>
+
+      <div class="metric-card success">
+        <div class="metric-label">Total Hours Added (Today)</div>
+        <div class="metric-value"><span id="totalHoursAdded">0</span>h</div>
+        <div class="metric-unit"><span id="totalHoursAddedMinutes">0</span> minutes</div>
       </div>
 
       <div class="metric-card success">
@@ -463,7 +563,41 @@
     <!-- Alerts Section -->
     <div class="content-section">
       <div class="section-header">
-        <h2 class="section-title">Active Alerts</h2>
+        <h2 class="section-title">Current Shifts Details for <span id="currentDate"></span></h2>
+        <div class="section-actions">
+          <input type="date" id="shiftsDateFilter" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;" onchange="refreshShifts()">
+          <button class="btn-secondary" onclick="refreshShifts()">Refresh</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table class="payroll-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Site</th>
+              <th>Post Code</th>
+              <th>Date</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Hours</th>
+              <th>Employee</th>
+              <th>Contact</th>
+              <th>SIA</th>
+              <th>Expiry</th>
+              <th>Total Hours Spent</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="shiftsBody">
+            <tr>
+              <td colspan="13" class="empty-state">Loading shift details...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Alerts Section -->
         <div class="section-actions">
           <button class="btn-secondary" onclick="refreshAlerts()">Refresh</button>
           <button class="btn-secondary" onclick="markAllRead()">Mark All as Read</button>
@@ -580,6 +714,40 @@
 
       document.getElementById('pendingPayrolls').textContent = data.pendingPayrolls;
       document.getElementById('expiringAlerts').textContent = data.expiringAlerts;
+
+      // Calculate total hours added today
+      calculateTodaysTotalHours();
+    }
+
+    async function calculateTodaysTotalHours() {
+      try {
+        const response = await fetch('/api/payroll');
+        const result = await response.json();
+
+        if (result.success && Array.isArray(result.data)) {
+          const today = new Date().toDateString();
+          
+          let todaysTotalHours = 0;
+          let todaysTotalMinutes = 0;
+
+          result.data.forEach(record => {
+            const recordDate = new Date(record.createdAt).toDateString();
+            if (recordDate === today) {
+              todaysTotalHours += record.totalHours || 0;
+              todaysTotalMinutes += record.totalMinutes || 0;
+            }
+          });
+
+          // Convert extra minutes to hours
+          todaysTotalHours += Math.floor(todaysTotalMinutes / 60);
+          todaysTotalMinutes = todaysTotalMinutes % 60;
+
+          document.getElementById('totalHoursAdded').textContent = todaysTotalHours;
+          document.getElementById('totalHoursAddedMinutes').textContent = todaysTotalMinutes;
+        }
+      } catch (error) {
+        console.error('Error calculating today\'s total hours:', error);
+      }
     }
 
     async function refreshAlerts() {
@@ -746,6 +914,68 @@
       } catch (error) {
         console.error('Error:', error);
       }
+    }
+
+    // Set current date on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('shiftsDateFilter').value = today;
+      document.getElementById('currentDate').textContent = today;
+      refreshShifts();
+    });
+
+    async function refreshShifts() {
+      try {
+        const dateFilter = document.getElementById('shiftsDateFilter').value || new Date().toISOString().split('T')[0];
+        document.getElementById('currentDate').textContent = dateFilter;
+        
+        const response = await fetch(`/api/payroll?date=${dateFilter}`);
+        const result = await response.json();
+
+        if (result.success) {
+          displayShifts(result.data);
+        }
+      } catch (error) {
+        console.error('Error loading shifts:', error);
+      }
+    }
+
+    function displayShifts(shifts) {
+      const tbody = document.getElementById('shiftsBody');
+      
+      if (!shifts || shifts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No shifts recorded for this date</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = shifts.map(shift => {
+        const totalHours = shift.totalHours || 0;
+        const totalMinutes = shift.totalMinutes || 0;
+        const hoursSpent = totalHours + (totalMinutes / 60);
+        
+        // Calculate total hours spent by this guard across all payroll records
+        const guardTotalHours = shift.totalHours || 0;
+        const guardTotalMinutes = shift.totalMinutes || 0;
+        const totalHoursSpent = guardTotalHours + (guardTotalMinutes / 60);
+
+        return `
+          <tr>
+            <td>${shift.clientName || '-'}</td>
+            <td>${shift.siteName || '-'}</td>
+            <td>${shift.postCode || '-'}</td>
+            <td>${shift.createdAt ? new Date(shift.createdAt).toLocaleDateString() : '-'}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>${totalHours}h ${totalMinutes}m</td>
+            <td>${shift.guardName || '-'}</td>
+            <td>${shift.phoneNumber || '-'}</td>
+            <td>${shift.siaLicense && shift.siaLicense.licenseNumber ? shift.siaLicense.licenseNumber : '-'}</td>
+            <td>${shift.siaLicense && shift.siaLicense.expiryDate ? new Date(shift.siaLicense.expiryDate).toLocaleDateString() : '-'}</td>
+            <td>${totalHoursSpent.toFixed(2)}h</td>
+            <td><span class="status-badge status-pending">Pending</span></td>
+          </tr>
+        `;
+      }).join('');
     }
   </script>
 </body>

@@ -334,6 +334,20 @@ const guardMasterSchema = new mongoose.Schema({
   // Bank Accounts (multiple)
   bankAccounts: [bankAccountSchema],
 
+  // Associated Guard (for hour distribution when primary guard can't work 40 hours/week)
+  associatedGuard: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GuardMaster',
+    default: null,
+    validate: {
+      validator: function(v) {
+        // Prevent self-reference
+        return v === null || v.toString() !== this._id.toString();
+      },
+      message: 'Associated guard cannot be the same as the current guard'
+    }
+  },
+
   // Status and Tracking
   isActive: {
     type: Boolean,

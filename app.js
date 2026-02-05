@@ -13,6 +13,7 @@ const GuardMaster = require('./models/GuardMaster');
 const MonthlyHours = require('./models/MonthlyHours');
 const PayrollDeduction = require('./models/PayrollDeduction');
 const Alert = require('./models/Alert');
+const Client = require('./models/Client');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
@@ -139,6 +140,13 @@ app.get('/guards', (req, res) => {
 });
 
 /**
+ * GET /clients - Client management page
+ */
+app.get('/clients', (req, res) => {
+  res.render('clients');
+});
+
+/**
  * GET /monthly-hours - Monthly hours entry page
  */
 app.get('/monthly-hours', (req, res) => {
@@ -232,6 +240,208 @@ app.get('/api/guards/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/bank-accounts - Get all bank accounts from all guards
+ */
+app.get('/api/bank-accounts', async (req, res) => {
+  try {
+    const guards = await GuardMaster.find({ isActive: true });
+    
+    // Aggregate all bank accounts from all guards
+    const allBankAccounts = [];
+    guards.forEach(guard => {
+      if (guard.bankAccounts && Array.isArray(guard.bankAccounts)) {
+        guard.bankAccounts.forEach(account => {
+          if (account.active !== false) {
+            allBankAccounts.push({
+              _id: account._id || `${guard._id}-${account.accountNumber}`,
+              guardId: guard._id,
+              guardName: guard.guardName,
+              accountHolderName: account.accountHolderName,
+              bankName: account.bankName,
+              sortCode: account.sortCode,
+              accountNumber: account.accountNumber,
+              isPrimary: account.isPrimary || false
+            });
+          }
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: allBankAccounts
+    });
+  } catch (error) {
+    console.error('Error fetching bank accounts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching bank accounts',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/clients - Get all clients (active and inactive)
+ */
+app.get('/api/clients', async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = {};
+
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    const clients = await Client.find(query).sort({ name: 1 });
+    res.json({
+      success: true,
+      data: clients,
+      count: clients.length
+    });
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching clients',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/clients - Create new client
+ */
+app.post('/api/clients', async (req, res) => {
+  try {
+    const { name, contactPerson, phoneNumber, email, address, city, postalCode, country } = req.body;
+
+    // Check if client already exists
+    const existingClient = await Client.findOne({ name: { $regex: `^${name}$`, $options: 'i' } });
+    if (existingClient) {
+      return res.status(400).json({
+        success: false,
+        message: 'Client with this name already exists'
+      });
+    }
+
+    const newClient = new Client({
+      name,
+      contactPerson,
+      phoneNumber,
+      email,
+      address,
+      city,
+      postalCode,
+      country: country || 'UK',
+      active: true
+    });
+
+    await newClient.save();
+    res.json({
+      success: true,
+      data: newClient,
+      message: 'Client created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating client:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating client',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/clients/:id - Update client
+ */
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid client ID'
+      });
+    }
+
+    const { name, contactPerson, phoneNumber, email, address, city, postalCode, country, active } = req.body;
+
+    const updatedClient = await Client.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        contactPerson,
+        phoneNumber,
+        email,
+        address,
+        city,
+        postalCode,
+        country: country || 'UK',
+        active: active !== undefined ? active : true
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedClient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: updatedClient,
+      message: 'Client updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating client:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating client',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/clients/:id - Delete client
+ */
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid client ID'
+      });
+    }
+
+    const deletedClient = await Client.findByIdAndDelete(req.params.id);
+
+    if (!deletedClient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: deletedClient,
+      message: 'Client deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting client',
+      error: error.message
+    });
+  }
+});
+
+/**
  * POST /api/guards - Create new guard
  */
 app.post('/api/guards', async (req, res) => {
@@ -247,6 +457,7 @@ app.post('/api/guards', async (req, res) => {
       shareCodeExpiryDate,
       siaLicense,
       bankAccounts,
+      associatedGuard,
       notes
     } = req.body;
 
@@ -276,6 +487,7 @@ app.post('/api/guards', async (req, res) => {
       shareCodeExpiryDate: britishPassport ? null : shareCodeExpiryDate,
       siaLicense: siaLicense || {},
       bankAccounts: bankAccounts || [],
+      associatedGuard: associatedGuard || null,
       notes
     });
 
@@ -318,6 +530,7 @@ app.put('/api/guards/:id', async (req, res) => {
       shareCodeExpiryDate,
       siaLicense,
       bankAccounts,
+      associatedGuard,
       isActive,
       notes
     } = req.body;
@@ -341,6 +554,7 @@ app.put('/api/guards/:id', async (req, res) => {
       shareCodeExpiryDate: britishPassport ? null : shareCodeExpiryDate,
       siaLicense: siaLicense || {},
       bankAccounts: bankAccounts || [],
+      associatedGuard: associatedGuard || null,
       isActive,
       notes
     };
@@ -1054,6 +1268,8 @@ app.get('/api/payroll/:id', async (req, res) => {
  */
 app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) => {
   try {
+    console.log('POST /api/payroll - Received data:', JSON.stringify(req.body, null, 2));
+
     // Parse bank accounts
     let bankAccounts = [];
     if (req.body.bankAccounts && typeof req.body.bankAccounts === 'string') {
@@ -1066,10 +1282,17 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
       bankAccounts = req.body.bankAccounts;
     }
 
+    // Get guard details if guardId is provided
+    let guard = null;
+    if (req.body.guardId) {
+      guard = await GuardMaster.findById(req.body.guardId);
+    }
+
     const payrollData = {
       // Basic info
       clientName: req.body.clientName,
       guardName: req.body.guardName,
+      guardId: req.body.guardId || null,
       siteName: req.body.siteName,
       
       // Visa information
@@ -1091,6 +1314,14 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
       // Bank accounts
       bankAccounts: bankAccounts,
       
+      // Associated Guard Hour Distribution
+      hoursDistribution: {
+        primaryGuardHours: parseFloat(req.body.primaryGuardHours) || parseFloat(req.body.totalHours) || 0,
+        associatedGuardHours: parseFloat(req.body.associatedGuardHours) || 0,
+        associatedGuardId: req.body.associatedGuardId || null,
+        associatedGuardName: req.body.associatedGuardName || ''
+      },
+      
       // Legacy fields for compatibility
       pay1: parseFloat(req.body.pay1) || 0,
       pay2: parseFloat(req.body.pay2) || 0,
@@ -1099,6 +1330,8 @@ app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) =>
       sortCode: req.body.sortCode,
       accountHolderName: req.body.accountHolderName
     };
+
+    console.log('Payroll Data to save:', JSON.stringify(payrollData, null, 2));
 
     const newRecord = new Payroll(payrollData);
     const savedRecord = await newRecord.save();

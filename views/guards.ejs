@@ -5,7 +5,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Guard Management - Payroll System</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/png" href="/images/salary.png">
   <style>
+    /* Global Header Styles */
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: white;
+    }
+
+    header .header-brand img {
+      width: 40px;
+      height: 40px;
+    }
+
+    header .header-brand h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    header nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    header nav a {
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    header nav a:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    header nav a::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: white;
+      transition: width 0.3s ease;
+    }
+
+    header nav a:hover::after {
+      width: 100%;
+    }
+
     .guards-container {
       max-width: 1400px;
       margin: 0 auto;
@@ -401,6 +476,26 @@
   </style>
 </head>
 <body>
+  <!-- Global Header -->
+  <header>
+    <div class="container">
+      <div class="header-brand">
+        <img src="/images/salary.png" alt="Payroll Logo" class="logo">
+        <h1>💼 Payroll Pro</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="/">🏠 Home</a></li>
+          <li><a href="/guards">👥 Guards</a></li>
+          <li><a href="/clients">🏢 Clients</a></li>
+          <li><a href="/monthly-hours">⏰ Monthly Hours</a></li>
+          <li><a href="/reports">📊 Reports</a></li>
+          <li><a href="/upload">📤 Upload</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
   <div class="guards-container">
     <!-- Header -->
     <div class="guards-header">
@@ -490,6 +585,17 @@
               <option value="Ghanaian">Ghanaian</option>
               <option value="Other">Other</option>
             </select>
+          </div>
+
+          <div class="form-group">
+            <label>Associated Guard (for hour distribution)</label>
+            <select id="associatedGuard">
+              <option value="">None</option>
+              <!-- Options will be populated by JavaScript -->
+            </select>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">
+              Select another guard to distribute hours when primary guard can't work full 40 hours/week.
+            </p>
           </div>
 
           <div class="form-group">
@@ -596,6 +702,7 @@
     // Load guards on page load
     document.addEventListener('DOMContentLoaded', () => {
       loadGuards();
+      loadAssociatedGuardsDropdown();
 
       // Set up form submission
       document.getElementById('guardForm').addEventListener('submit', saveGuard);
@@ -625,6 +732,31 @@
       } catch (error) {
         console.error('Error loading guards:', error);
         showToast('Error loading guards', 'error');
+      }
+    }
+
+    async function loadAssociatedGuardsDropdown() {
+      try {
+        const response = await fetch('/api/guards');
+        const result = await response.json();
+
+        if (result.success) {
+          const dropdown = document.getElementById('associatedGuard');
+          const currentValue = dropdown.value;
+          
+          // Preserve existing options but update the guard list
+          const otherGuards = result.data.filter(g => g._id !== currentGuardId);
+          
+          // Keep the first "None" option and add all other guards
+          dropdown.innerHTML = '<option value="">None</option>' + 
+            otherGuards.map(guard => `
+              <option value="${guard._id}">${guard.guardName}</option>
+            `).join('');
+          
+          if (currentValue) dropdown.value = currentValue;
+        }
+      } catch (error) {
+        console.error('Error loading associated guards:', error);
       }
     }
 
@@ -672,6 +804,7 @@
       toggleShareCode();
       toggleSIA();
       updateBankAccountsDisplay();
+      loadAssociatedGuardsDropdown();
       document.getElementById('guardModal').classList.add('active');
     }
 
@@ -694,6 +827,7 @@
           document.getElementById('britishPassport').checked = guard.britishPassport || false;
           document.getElementById('shareCode').value = guard.shareCode || '';
           document.getElementById('shareCodeExpiryDate').value = guard.shareCodeExpiryDate ? guard.shareCodeExpiryDate.split('T')[0] : '';
+          document.getElementById('associatedGuard').value = guard.associatedGuard || '';
           document.getElementById('isActive').checked = guard.isActive !== false;
           document.getElementById('notes').value = guard.notes || '';
 
@@ -708,6 +842,7 @@
           toggleShareCode();
           toggleSIA();
           updateBankAccountsDisplay();
+          loadAssociatedGuardsDropdown();
 
           document.getElementById('modalTitle').textContent = 'Edit Guard';
           document.getElementById('guardModal').classList.add('active');
@@ -743,6 +878,7 @@
         britishPassport: document.getElementById('britishPassport').checked,
         shareCode: document.getElementById('shareCode').value,
         shareCodeExpiryDate: document.getElementById('shareCodeExpiryDate').value,
+        associatedGuard: document.getElementById('associatedGuard').value || null,
         siaLicense: {
           required: document.getElementById('siaRequired').checked,
           licenseNumber: document.getElementById('siaLicenseNumber').value,
