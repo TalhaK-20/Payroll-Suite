@@ -18,6 +18,7 @@ const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
 const EnhancedExcelGenerator = require('./utils/enhancedExcelGenerator');
 const payrollValidation = require('./utils/payrollValidation');
+const { setupPayrollRoutes } = require('./utils/payrollValidation');
 
 // Initialize Express app
 const app = express();
@@ -1696,6 +1697,9 @@ app.delete('/api/daily-hours/:id', async (req, res) => {
 });
 
 // ==================== ERROR HANDLING ====================
+
+// Setup payroll routes
+setupPayrollRoutes(app, Payroll, mongoose);
 
 // 404 handler
 app.use((req, res) => {

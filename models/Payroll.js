@@ -4,35 +4,19 @@ const mongoose = require('mongoose');
 const bankAccountSchema = new mongoose.Schema({
   accountHolderName: {
     type: String,
-    required: true,
     trim: true
   },
   bankName: {
     type: String,
-    required: true,
     trim: true
   },
   sortCode: {
     type: String,
-    required: true,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return /^\d{2}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Sort code must be in format: XX-XX-XX'
-    }
+    trim: true
   },
   accountNumber: {
     type: String,
-    required: true,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return /^\d{8}$/.test(v);
-      },
-      message: 'Account number must be 8 digits'
-    }
+    trim: true
   },
   isPrimary: {
     type: Boolean,
@@ -48,17 +32,14 @@ const bankAccountSchema = new mongoose.Schema({
 const paymentDistributionSchema = new mongoose.Schema({
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'BankAccount',
-    required: true
+    ref: 'BankAccount'
   },
   amount: {
     type: Number,
-    required: true,
     min: 0
   },
   percentage: {
     type: Number,
-    required: true,
     min: 0,
     max: 100
   },
@@ -76,7 +57,6 @@ const payrollSchema = new mongoose.Schema({
   // Client Information
   clientName: {
     type: String,
-    required: true,
     trim: true
   },
   siteName: {
@@ -88,7 +68,6 @@ const payrollSchema = new mongoose.Schema({
   // Guard Basic Information
   guardName: {
     type: String,
-    required: true,
     trim: true
   },
   nationality: {
@@ -98,31 +77,14 @@ const payrollSchema = new mongoose.Schema({
   },
   insuranceNumber: {
     type: String,
-    required: true,
-    unique: true,
     trim: true,
-    validate: {
-      validator: function(v) {
-        return /^[A-Z]{2}\s\d{3}\s\d{3}\s[A-Z]$/.test(v);
-      },
-      message: 'Insurance number format: AB 123 456 C'
-    }
+    default: ''
   },
 
   // Immigration/Visa Information
   visaStatus: {
     type: String,
-    enum: [
-      'Student',
-      'Skilled Worker',
-      'PSW',
-      'Dependent/Spouse',
-      'Permanent Resident',
-      'Settled Status',
-      'Pre-Settled Status',
-      'Refugee/Asylum'
-    ],
-    required: true
+    default: ''
   },
   britishPassport: {
     type: Boolean,
@@ -131,55 +93,36 @@ const payrollSchema = new mongoose.Schema({
   shareCode: {
     type: String,
     trim: true,
-    default: null,
-    // Only required if britishPassport is false
-    validate: {
-      validator: function(v) {
-        if (this.britishPassport === true) {
-          return true; // Not required for British passport holders
-        }
-        return v && v.trim().length > 0; // Required for others
-      },
-      message: 'Share code is required for non-British passport holders'
-    }
+    default: null
   },
   shareCodeExpiryDate: {
     type: Date,
-    default: null,
-    validate: {
-      validator: function(v) {
-        if (this.britishPassport === true) {
-          return true; // Not required for British passport holders
-        }
-        return v !== null; // Required for others
-      },
-      message: 'Share code expiry date is required for non-British passport holders'
-    }
+    default: null
   },
 
   // Working Hours (Separated)
   totalHours: {
     type: Number,
-    required: true,
-    min: 0
+    min: 0,
+    default: 0
   },
   totalMinutes: {
     type: Number,
-    required: true,
     min: 0,
-    max: 59
+    max: 59,
+    default: 0
   },
 
   // Rates
   chargeRate: {
     type: Number,
-    required: true,
-    min: 0
+    min: 0,
+    default: 0
   },
   payRate: {
     type: Number,
-    required: true,
-    min: 0
+    min: 0,
+    default: 0
   },
 
   // Bank Accounts (Multiple)

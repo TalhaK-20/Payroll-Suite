@@ -89,46 +89,39 @@ function addBankAccount() {
       
       <div class="form-row-2col">
         <div class="form-group">
-          <label>Account Holder Name <span class="required">*</span></label>
+          <label>Account Holder Name</label>
           <input type="text" 
             id="accountHolderName-${accountIndex}" 
             name="bankAccounts[${accountIndex}][accountHolderName]" 
-            placeholder="e.g., John Smith" 
-            required>
+            placeholder="e.g., John Smith">
           <small class="field-hint">Name on bank account</small>
         </div>
         <div class="form-group">
-          <label>Bank Name <span class="required">*</span></label>
+          <label>Bank Name</label>
           <input type="text" 
             id="bankName-${accountIndex}" 
             name="bankAccounts[${accountIndex}][bankName]" 
-            placeholder="e.g., Barclays, HSBC, Lloyds" 
-            required>
+            placeholder="e.g., Barclays, HSBC, Lloyds">
           <small class="field-hint">Bank name</small>
         </div>
       </div>
       
       <div class="form-row-2col">
         <div class="form-group">
-          <label>Sort Code <span class="required">*</span></label>
+          <label>Sort Code</label>
           <input type="text" 
             id="sortCode-${accountIndex}" 
             name="bankAccounts[${accountIndex}][sortCode]" 
-            placeholder="e.g., 20-00-00" 
-            pattern="\d{2}-\d{2}-\d{2}"
-            required>
-          <small class="field-hint">Format: XX-XX-XX</small>
+            placeholder="e.g., 20-00-00">
+          <small class="field-hint">Format: XX-XX-XX, XX XX XX, or XXXXXX (optional)</small>
         </div>
         <div class="form-group">
-          <label>Account Number <span class="required">*</span></label>
+          <label>Account Number</label>
           <input type="text" 
             id="accountNumber-${accountIndex}" 
             name="bankAccounts[${accountIndex}][accountNumber]" 
-            placeholder="e.g., 12345678" 
-            pattern="\d{8}"
-            maxlength="8"
-            required>
-          <small class="field-hint">8-digit account number</small>
+            placeholder="e.g., 12345678">
+          <small class="field-hint">8+ digits (spaces/dashes optional, optional)</small>
         </div>
       </div>
       

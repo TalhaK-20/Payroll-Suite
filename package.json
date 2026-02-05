@@ -5,7 +5,9 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "test": "node test-payroll-form.js",
+    "test:payroll": "node test-payroll-form.js"
   },
   "keywords": [
     "payroll",

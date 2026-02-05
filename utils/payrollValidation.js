@@ -5,204 +5,26 @@ const { body, validationResult } = require('express-validator');
 
 /**
  * VALIDATION RULES FOR PAYROLL RECORDS
- * Enhanced with visa, immigration, and multiple bank account support
+ * All validations removed - accepting all data as-is
  */
 const payrollValidationRules = () => {
-  return [
-    // Guard Basic Information
-    body('guardName')
-      .trim()
-      .notEmpty().withMessage('Guard Name is required')
-      .isLength({ min: 2, max: 100 }).withMessage('Guard Name must be between 2 and 100 characters'),
-    
-    body('nationality')
-      .trim()
-      .notEmpty().withMessage('Nationality is required')
-      .isLength({ min: 2, max: 50 }).withMessage('Nationality must be valid'),
-    
-    body('insuranceNumber')
-      .trim()
-      .notEmpty().withMessage('Insurance Number is required')
-      .matches(/^[A-Z]{2}\s\d{3}\s\d{3}\s[A-Z]$/).withMessage('Insurance Number format must be: AB 123 456 C'),
-    
-    // Site information (optional)
-    body('siteName')
-      .trim()
-      .optional({ checkFalsy: true })
-      .isLength({ max: 100 }).withMessage('Site Name is too long'),
-    
-    // Client Information
-    body('clientName')
-      .trim()
-      .notEmpty().withMessage('Client Name is required')
-      .isLength({ min: 2, max: 100 }).withMessage('Client Name must be valid'),
-    
-    // Visa Information
-    body('visaStatus')
-      .notEmpty().withMessage('Visa Status is required')
-      .isIn([
-        'Student',
-        'Skilled Worker',
-        'PSW',
-        'Dependent/Spouse',
-        'Permanent Resident',
-        'Settled Status',
-        'Pre-Settled Status',
-        'Refugee/Asylum'
-      ]).withMessage('Invalid Visa Status selected'),
-    
-    body('britishPassport')
-      .optional()
-      .isBoolean().withMessage('British Passport must be true or false'),
-    
-    // Conditional: Share Code (required if NOT British Passport)
-    body('shareCode')
-      .custom((value, { req }) => {
-        if (req.body.britishPassport === false || req.body.britishPassport === 'false') {
-          if (!value || value.trim().length === 0) {
-            throw new Error('Share Code is required for non-British passport holders');
-          }
-        }
-        return true;
-      }),
-    
-    // Conditional: Share Code Expiry Date (required if NOT British Passport)
-    body('shareCodeExpiryDate')
-      .custom((value, { req }) => {
-        if (req.body.britishPassport === false || req.body.britishPassport === 'false') {
-          if (!value) {
-            throw new Error('Share Code Expiry Date is required for non-British passport holders');
-          }
-          // Validate it's a valid date
-          if (isNaN(Date.parse(value))) {
-            throw new Error('Share Code Expiry Date must be a valid date');
-          }
-        }
-        return true;
-      }),
-    
-    // Working Hours
-    body('totalHours')
-      .notEmpty().withMessage('Total Hours is required')
-      .isFloat({ min: 0 }).withMessage('Total Hours must be a positive number'),
-    
-    body('totalMinutes')
-      .notEmpty().withMessage('Total Minutes is required')
-      .isInt({ min: 0, max: 59 }).withMessage('Total Minutes must be between 0 and 59'),
-    
-    // Rates
-    body('chargeRate')
-      .notEmpty().withMessage('Charge Rate is required')
-      .isFloat({ min: 0 }).withMessage('Charge Rate must be a positive number'),
-    
-    body('payRate')
-      .notEmpty().withMessage('Pay Rate is required')
-      .isFloat({ min: 0 }).withMessage('Pay Rate must be a positive number'),
-    
-    // Legacy fields (for backward compatibility)
-    body('pay1')
-      .optional({ checkFalsy: true })
-      .isFloat({ min: 0 }).withMessage('Pay 1 must be a positive number'),
-    
-    body('pay2')
-      .optional({ checkFalsy: true })
-      .isFloat({ min: 0 }).withMessage('Pay 2 must be a positive number'),
-    
-    body('pay3')
-      .optional({ checkFalsy: true })
-      .isFloat({ min: 0 }).withMessage('Pay 3 must be a positive number'),
-    
-    body('accountNo')
-      .optional({ checkFalsy: true })
-      .trim()
-      .isLength({ max: 20 }).withMessage('Account Number is too long'),
-    
-    body('sortCode')
-      .optional({ checkFalsy: true })
-      .trim()
-      .matches(/^\d{2}-\d{2}-\d{2}$/).withMessage('Sort code format must be: XX-XX-XX'),
-    
-    body('accountHolderName')
-      .optional({ checkFalsy: true })
-      .trim()
-      .isLength({ max: 100 }).withMessage('Account Holder Name is too long')
-  ];
+  return [];
 };
 
 /**
  * VALIDATION RULES FOR BANK ACCOUNTS ARRAY
- * Validates multiple bank account entries
+ * All validations removed - accepting all data as-is
  */
 const bankAccountsValidationRules = () => {
-  return [
-    body('bankAccounts')
-      .custom((value, { req }) => {
-        if (!Array.isArray(value) || value.length === 0) {
-          throw new Error('At least one bank account is required');
-        }
-        
-        // Validate each bank account
-        value.forEach((account, index) => {
-          if (!account.accountHolderName || account.accountHolderName.trim() === '') {
-            throw new Error(`Account ${index + 1}: Account Holder Name is required`);
-          }
-          if (!account.bankName || account.bankName.trim() === '') {
-            throw new Error(`Account ${index + 1}: Bank Name is required`);
-          }
-          if (!account.sortCode || !/^\d{2}-\d{2}-\d{2}$/.test(account.sortCode)) {
-            throw new Error(`Account ${index + 1}: Sort Code must be in format XX-XX-XX`);
-          }
-          if (!account.accountNumber || !/^\d{8}$/.test(account.accountNumber)) {
-            throw new Error(`Account ${index + 1}: Account Number must be 8 digits`);
-          }
-        });
-        
-        return true;
-      })
-  ];
+  return [];
 };
 
 /**
  * VALIDATION RULES FOR PAYMENT DISTRIBUTION
- * Validates that payment splits add up to 100%
+ * All validations removed - accepting all data as-is
  */
 const paymentDistributionValidationRules = () => {
-  return [
-    body('payments')
-      .custom((value, { req }) => {
-        if (!Array.isArray(value) || value.length === 0) {
-          // Payments are optional, but if provided must be valid
-          return true;
-        }
-        
-        let totalPercentage = 0;
-        let totalAmount = 0;
-        const totalPay = (parseFloat(req.body.totalHours) || 0 + 
-                         (parseFloat(req.body.totalMinutes) || 0) / 60) * 
-                        (parseFloat(req.body.payRate) || 0);
-        
-        value.forEach((payment, index) => {
-          if (payment.percentage) {
-            totalPercentage += parseFloat(payment.percentage);
-          }
-          if (payment.amount) {
-            totalAmount += parseFloat(payment.amount);
-          }
-        });
-        
-        // If percentages are specified, they must total 100
-        if (totalPercentage > 0 && Math.abs(totalPercentage - 100) > 0.01) {
-          throw new Error('Payment percentages must total 100%');
-        }
-        
-        // If amounts are specified, they must equal total pay
-        if (totalAmount > 0 && Math.abs(totalAmount - totalPay) > 0.01) {
-          throw new Error('Payment amounts must equal total calculated pay');
-        }
-        
-        return true;
-      })
-  ];
+  return [];
 };
 
 /**
