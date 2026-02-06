@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guard Management - Payroll System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .guards-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .guards-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .guards-header h1 {
+      margin: 0;
+      font-size: 2em;
+      color: #333;
+    }
+
+    .search-filter-section {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .search-filter-section input,
+    .search-filter-section select {
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .add-guard-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s;
+    }
+
+    .add-guard-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .guards-table {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .guards-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .guards-table th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .guards-table td {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .guards-table tr:hover {
+      background-color: #f9f9f9;
+    }
+
+    .guard-status {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .guard-status.active {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .guard-status.inactive {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .guard-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-edit {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .btn-edit:hover {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .btn-delete {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .btn-delete:hover {
+      background-color: #c62828;
+      color: white;
+    }
+
+    /* Modal Styles */
+    .guard-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.3s;
+    }
+
+    .guard-modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .guard-modal-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.5em;
+      color: #333;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #999;
+    }
+
+    .close-modal:hover {
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .conditional-section {
+      margin-top: 15px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+      display: none;
+    }
+
+    .conditional-section.show {
+      display: block;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
+    .bank-accounts-section {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+
+    .bank-accounts-section h4 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .bank-account-item {
+      background: white;
+      padding: 12px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+    }
+
+    .sia-section {
+      margin-top: 15px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
+      justify-content: flex-end;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      padding: 12px 25px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background-color: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #d0d0d0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      opacity: 0.5;
+      margin-bottom: 15px;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      background-color: #4caf50;
+      color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      animation: slideInUp 0.3s;
+      z-index: 2000;
+    }
+
+    .toast.error {
+      background-color: #f44336;
+    }
+
+    @keyframes slideInUp {
+      from {
+        transform: translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .nav-tabs button {
+      background: none;
+      border: none;
+      padding: 12px 20px;
+      cursor: pointer;
+      color: #999;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .nav-tabs button.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="guards-container">
+    <!-- Header -->
+    <div class="guards-header">
+      <h1>Guard Management</h1>
+      <div class="search-filter-section">
+        <input type="text" id="searchInput" placeholder="Search by name, email, phone...">
+        <select id="statusFilter">
+          <option value="">All Status</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+        <button class="add-guard-btn" onclick="openAddGuardModal()">+ Add Guard</button>
+      </div>
+    </div>
+
+    <!-- Guards Table -->
+    <div class="guards-table">
+      <table id="guardsTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Nationality</th>
+            <th>Visa Type</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="guardsTableBody">
+          <!-- Populated by JavaScript -->
+        </tbody>
+      </table>
+      <div id="emptyState" class="empty-state" style="display: none;">
+        <p>No guards found. Click "Add Guard" to create one.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Guard Modal -->
+  <div id="guardModal" class="guard-modal">
+    <div class="guard-modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add New Guard</h2>
+        <button class="close-modal" onclick="closeGuardModal()">&times;</button>
+      </div>
+
+      <form id="guardForm">
+        <!-- Basic Information Tab -->
+        <div class="nav-tabs">
+          <button type="button" class="tab-btn active" onclick="switchTab(event, 'basic-info')">Basic Info</button>
+          <button type="button" class="tab-btn" onclick="switchTab(event, 'visa-info')">Visa & Immigration</button>
+          <button type="button" class="tab-btn" onclick="switchTab(event, 'sia-info')">SIA License</button>
+          <button type="button" class="tab-btn" onclick="switchTab(event, 'bank-info')">Bank Accounts</button>
+        </div>
+
+        <!-- Basic Information -->
+        <div id="basic-info" class="tab-content active">
+          <div class="form-group">
+            <label>Guard Name *</label>
+            <input type="text" id="guardName" required>
+          </div>
+
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="email">
+          </div>
+
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="phoneNumber">
+          </div>
+
+          <div class="form-group">
+            <label>Nationality *</label>
+            <select id="nationality" required>
+              <option value="">Select Nationality</option>
+              <option value="British">British</option>
+              <option value="Indian">Indian</option>
+              <option value="Pakistani">Pakistani</option>
+              <option value="Polish">Polish</option>
+              <option value="Romanian">Romanian</option>
+              <option value="Bulgarian">Bulgarian</option>
+              <option value="Brazilian">Brazilian</option>
+              <option value="Filipino">Filipino</option>
+              <option value="Nigerian">Nigerian</option>
+              <option value="Ghanaian">Ghanaian</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="notes"></textarea>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="isActive" checked>
+            <label for="isActive" style="margin: 0;">Active Guard</label>
+          </div>
+        </div>
+
+        <!-- Visa & Immigration -->
+        <div id="visa-info" class="tab-content">
+          <div class="form-group">
+            <label>Visa Type *</label>
+            <select id="visaType" required>
+              <option value="">Select Visa Type</option>
+              <option value="British Citizen">British Citizen</option>
+              <option value="Student">Student</option>
+              <option value="Skilled Worker">Skilled Worker</option>
+              <option value="PSW (Post-Study Work)">PSW (Post-Study Work)</option>
+              <option value="Dependent/Spouse">Dependent/Spouse</option>
+              <option value="Permanent Resident">Permanent Resident</option>
+              <option value="Settled Status">Settled Status</option>
+              <option value="Pre-Settled Status">Pre-Settled Status</option>
+              <option value="Refugee/Asylum">Refugee/Asylum</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="britishPassport" onchange="toggleShareCode()">
+            <label for="britishPassport" style="margin: 0;">British Passport Holder</label>
+          </div>
+
+          <div id="shareCodeSection" class="conditional-section">
+            <div class="form-group">
+              <label>Share Code *</label>
+              <input type="text" id="shareCode" placeholder="e.g., ABC123XYZ789">
+            </div>
+
+            <div class="form-group">
+              <label>Share Code Expiry Date *</label>
+              <input type="date" id="shareCodeExpiryDate">
+            </div>
+          </div>
+        </div>
+
+        <!-- SIA License -->
+        <div id="sia-info" class="tab-content">
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="siaRequired" onchange="toggleSIA()">
+            <label for="siaRequired" style="margin: 0;">SIA License Required</label>
+          </div>
+
+          <div id="siaSection" class="sia-section" style="display: none;">
+            <div class="form-group">
+              <label>License Number</label>
+              <input type="text" id="siaLicenseNumber">
+            </div>
+
+            <div class="form-group">
+              <label>Category</label>
+              <select id="siaCategory">
+                <option value="">Select Category</option>
+                <option value="Front of House">Front of House</option>
+                <option value="Close Protection">Close Protection</option>
+                <option value="Security Guarding">Security Guarding</option>
+                <option value="Door Supervision">Door Supervision</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Expiry Date</label>
+              <input type="date" id="siaExpiryDate">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Accounts -->
+        <div id="bank-info" class="tab-content">
+          <button type="button" onclick="addBankAccount()" style="margin-bottom: 15px; padding: 10px 15px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">+ Add Bank Account</button>
+
+          <div id="bankAccountsContainer">
+            <!-- Bank accounts will be added here -->
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeGuardModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Guard</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let currentGuardId = null;
+    let bankAccountsData = [];
+
+    // Load guards on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadGuards();
+
+      // Set up form submission
+      document.getElementById('guardForm').addEventListener('submit', saveGuard);
+
+      // Search and filter
+      document.getElementById('searchInput').addEventListener('input', loadGuards);
+      document.getElementById('statusFilter').addEventListener('change', loadGuards);
+    });
+
+    async function loadGuards() {
+      try {
+        const search = document.getElementById('searchInput').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        let url = '/api/guards?';
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+        if (statusFilter) url += `isActive=${statusFilter}&`;
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success) {
+          displayGuards(result.data);
+        } else {
+          showToast('Error loading guards', 'error');
+        }
+      } catch (error) {
+        console.error('Error loading guards:', error);
+        showToast('Error loading guards', 'error');
+      }
+    }
+
+    function displayGuards(guards) {
+      const tbody = document.getElementById('guardsTableBody');
+      const emptyState = document.getElementById('emptyState');
+
+      if (guards.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      tbody.innerHTML = guards.map(guard => `
+        <tr>
+          <td>${guard.guardName}</td>
+          <td>${guard.nationality}</td>
+          <td>${guard.visaType}</td>
+          <td>${guard.email || '-'}</td>
+          <td>${guard.phoneNumber || '-'}</td>
+          <td>
+            <span class="guard-status ${guard.isActive ? 'active' : 'inactive'}">
+              ${guard.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td>
+            <div class="guard-actions">
+              <button class="btn-icon btn-edit" onclick="editGuard('${guard._id}')">Edit</button>
+              <button class="btn-icon btn-delete" onclick="deleteGuard('${guard._id}')">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openAddGuardModal() {
+      currentGuardId = null;
+      bankAccountsData = [];
+      document.getElementById('guardForm').reset();
+      document.getElementById('modalTitle').textContent = 'Add New Guard';
+      document.getElementById('isActive').checked = true;
+      document.getElementById('britishPassport').checked = false;
+      document.getElementById('siaRequired').checked = false;
+      toggleShareCode();
+      toggleSIA();
+      updateBankAccountsDisplay();
+      document.getElementById('guardModal').classList.add('active');
+    }
+
+    async function editGuard(id) {
+      try {
+        const response = await fetch(`/api/guards/${id}`);
+        const result = await response.json();
+
+        if (result.success) {
+          const guard = result.data;
+          currentGuardId = id;
+          bankAccountsData = guard.bankAccounts || [];
+
+          // Fill form
+          document.getElementById('guardName').value = guard.guardName || '';
+          document.getElementById('email').value = guard.email || '';
+          document.getElementById('phoneNumber').value = guard.phoneNumber || '';
+          document.getElementById('nationality').value = guard.nationality || '';
+          document.getElementById('visaType').value = guard.visaType || '';
+          document.getElementById('britishPassport').checked = guard.britishPassport || false;
+          document.getElementById('shareCode').value = guard.shareCode || '';
+          document.getElementById('shareCodeExpiryDate').value = guard.shareCodeExpiryDate ? guard.shareCodeExpiryDate.split('T')[0] : '';
+          document.getElementById('isActive').checked = guard.isActive !== false;
+          document.getElementById('notes').value = guard.notes || '';
+
+          // SIA License
+          if (guard.siaLicense && guard.siaLicense.required) {
+            document.getElementById('siaRequired').checked = true;
+            document.getElementById('siaLicenseNumber').value = guard.siaLicense.licenseNumber || '';
+            document.getElementById('siaCategory').value = guard.siaLicense.category || '';
+            document.getElementById('siaExpiryDate').value = guard.siaLicense.expiryDate ? guard.siaLicense.expiryDate.split('T')[0] : '';
+          }
+
+          toggleShareCode();
+          toggleSIA();
+          updateBankAccountsDisplay();
+
+          document.getElementById('modalTitle').textContent = 'Edit Guard';
+          document.getElementById('guardModal').classList.add('active');
+        }
+      } catch (error) {
+        console.error('Error loading guard:', error);
+        showToast('Error loading guard', 'error');
+      }
+    }
+
+    async function saveGuard(e) {
+      e.preventDefault();
+
+      // Clean up bank accounts data - remove temporary 'id' field, keep only actual data
+      const cleanedBankAccounts = bankAccountsData.map(account => {
+        const cleaned = {};
+        // Only copy actual bank account fields, not the temporary frontend 'id'
+        if (account.accountHolderName) cleaned.accountHolderName = account.accountHolderName;
+        if (account.bankName) cleaned.bankName = account.bankName;
+        if (account.sortCode) cleaned.sortCode = account.sortCode;
+        if (account.accountNumber) cleaned.accountNumber = account.accountNumber;
+        cleaned.isPrimary = account.isPrimary || false;
+        cleaned.active = account.active !== false;
+        return cleaned;
+      });
+
+      const guardData = {
+        guardName: document.getElementById('guardName').value,
+        email: document.getElementById('email').value,
+        phoneNumber: document.getElementById('phoneNumber').value,
+        nationality: document.getElementById('nationality').value,
+        visaType: document.getElementById('visaType').value,
+        britishPassport: document.getElementById('britishPassport').checked,
+        shareCode: document.getElementById('shareCode').value,
+        shareCodeExpiryDate: document.getElementById('shareCodeExpiryDate').value,
+        siaLicense: {
+          required: document.getElementById('siaRequired').checked,
+          licenseNumber: document.getElementById('siaLicenseNumber').value,
+          category: document.getElementById('siaCategory').value,
+          expiryDate: document.getElementById('siaExpiryDate').value
+        },
+        bankAccounts: cleanedBankAccounts,
+        isActive: document.getElementById('isActive').checked,
+        notes: document.getElementById('notes').value
+      };
+
+      try {
+        const url = currentGuardId ? `/api/guards/${currentGuardId}` : '/api/guards';
+        const method = currentGuardId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(guardData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(result.message, 'success');
+          closeGuardModal();
+          loadGuards();
+        } else {
+          showToast(result.message || 'Error saving guard', 'error');
+        }
+      } catch (error) {
+        console.error('Error saving guard:', error);
+        showToast('Error saving guard', 'error');
+      }
+    }
+
+    async function deleteGuard(id) {
+      if (!confirm('Are you sure you want to delete this guard? All associated records will be deleted.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/guards/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (result.success) {
+          showToast('Guard deleted successfully', 'success');
+          loadGuards();
+        } else {
+          showToast(result.message || 'Error deleting guard', 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting guard:', error);
+        showToast('Error deleting guard', 'error');
+      }
+    }
+
+    function toggleShareCode() {
+      const isBritish = document.getElementById('britishPassport').checked;
+      const section = document.getElementById('shareCodeSection');
+      if (isBritish) {
+        section.classList.remove('show');
+      } else {
+        section.classList.add('show');
+      }
+    }
+
+    function toggleSIA() {
+      const isSIARequired = document.getElementById('siaRequired').checked;
+      const section = document.getElementById('siaSection');
+      if (isSIARequired) {
+        section.style.display = 'block';
+      } else {
+        section.style.display = 'none';
+      }
+    }
+
+    function addBankAccount() {
+      const accountId = Date.now();
+      const account = {
+        id: accountId,
+        accountHolderName: '',
+        bankName: '',
+        sortCode: '',
+        accountNumber: '',
+        isPrimary: bankAccountsData.length === 0,
+        active: true
+      };
+      bankAccountsData.push(account);
+      updateBankAccountsDisplay();
+    }
+
+    function removeBankAccount(id) {
+      bankAccountsData = bankAccountsData.filter(acc => acc.id !== id);
+      updateBankAccountsDisplay();
+    }
+
+    function updateBankAccount(id, field, value) {
+      const account = bankAccountsData.find(acc => acc.id === id);
+      if (account) {
+        account[field] = value;
+      }
+    }
+
+    function setAsPrimary(id) {
+      bankAccountsData.forEach(acc => {
+        acc.isPrimary = acc.id === id;
+      });
+      updateBankAccountsDisplay();
+    }
+
+    function updateBankAccountsDisplay() {
+      const container = document.getElementById('bankAccountsContainer');
+      if (bankAccountsData.length === 0) {
+        container.innerHTML = '<p style="color: #999;">No bank accounts added yet.</p>';
+        return;
+      }
+
+      container.innerHTML = bankAccountsData.map(account => `
+        <div class="bank-account-item">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Account Holder Name</label>
+              <input type="text" value="${account.accountHolderName}" onchange="updateBankAccount(${account.id}, 'accountHolderName', this.value)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Bank Name</label>
+              <input type="text" value="${account.bankName}" onchange="updateBankAccount(${account.id}, 'bankName', this.value)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Sort Code (XX-XX-XX)</label>
+              <input type="text" value="${account.sortCode}" onchange="updateBankAccount(${account.id}, 'sortCode', this.value)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Account Number (8 digits)</label>
+              <input type="text" value="${account.accountNumber}" onchange="updateBankAccount(${account.id}, 'accountNumber', this.value)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 10px;">
+              <label style="margin: 0; cursor: pointer; font-size: 14px;">
+                <input type="radio" name="primary-${account.id}" ${account.isPrimary ? 'checked' : ''} onchange="setAsPrimary(${account.id})"> Primary
+              </label>
+              <label style="margin: 0; cursor: pointer; font-size: 14px;">
+                <input type="checkbox" ${account.active ? 'checked' : ''} onchange="updateBankAccount(${account.id}, 'active', this.checked)"> Active
+              </label>
+            </div>
+            <button type="button" onclick="removeBankAccount(${account.id})" style="padding: 6px 12px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function closeGuardModal() {
+      document.getElementById('guardModal').classList.remove('active');
+    }
+
+    function switchTab(e, tabName) {
+      e.preventDefault();
+      
+      // Remove active class from all tabs and contents
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      // Add active class to clicked tab and corresponding content
+      e.target.classList.add('active');
+      document.getElementById(tabName).classList.add('active');
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+      const modal = document.getElementById('guardModal');
+      if (event.target === modal) {
+        modal.classList.remove('active');
+      }
+    };
+  </script>
+</body>
+</html>

@@ -9,6 +9,10 @@ const { body, validationResult } = require('express-validator');
 // Import models and utilities
 const Payroll = require('./models/Payroll');
 const DailyHours = require('./models/DailyHours');
+const GuardMaster = require('./models/GuardMaster');
+const MonthlyHours = require('./models/MonthlyHours');
+const PayrollDeduction = require('./models/PayrollDeduction');
+const Alert = require('./models/Alert');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
@@ -124,6 +128,816 @@ app.get('/', (req, res) => {
  */
 app.get('/upload', (req, res) => {
   res.render('upload');
+});
+
+/**
+ * GET /guards - Guard management page
+ */
+app.get('/guards', (req, res) => {
+  res.render('guards');
+});
+
+/**
+ * GET /monthly-hours - Monthly hours entry page
+ */
+app.get('/monthly-hours', (req, res) => {
+  res.render('monthly-hours');
+});
+
+/**
+ * GET /dashboard - Dashboard with metrics and alerts
+ */
+app.get('/dashboard', (req, res) => {
+  res.render('dashboard');
+});
+
+/**
+ * GET /reports - Advanced reporting page
+ */
+app.get('/reports', (req, res) => {
+  res.render('reports');
+});
+
+// ==================== API ROUTES - GUARD MASTER ====================
+
+/**
+ * GET /api/guards - Get all guards
+ */
+app.get('/api/guards', async (req, res) => {
+  try {
+    const { search, isActive } = req.query;
+    let query = {};
+
+    if (search) {
+      query.$or = [
+        { guardName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phoneNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+
+    const guards = await GuardMaster.find(query).sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      data: guards,
+      count: guards.length
+    });
+  } catch (error) {
+    console.error('Error fetching guards:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching guards',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/guards/:id - Get single guard
+ */
+app.get('/api/guards/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid guard ID'
+      });
+    }
+
+    const guard = await GuardMaster.findById(req.params.id);
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Guard not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: guard
+    });
+  } catch (error) {
+    console.error('Error fetching guard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching guard',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/guards - Create new guard
+ */
+app.post('/api/guards', async (req, res) => {
+  try {
+    const {
+      guardName,
+      email,
+      phoneNumber,
+      nationality,
+      visaType,
+      britishPassport,
+      shareCode,
+      shareCodeExpiryDate,
+      siaLicense,
+      bankAccounts,
+      notes
+    } = req.body;
+
+    if (!guardName || !nationality || !visaType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: guardName, nationality, visaType'
+      });
+    }
+
+    // Validate Share Code for non-British passport
+    if (!britishPassport && (!shareCode || !shareCodeExpiryDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Share code and expiry date required for non-British passport holders'
+      });
+    }
+
+    const newGuard = new GuardMaster({
+      guardName,
+      email,
+      phoneNumber,
+      nationality,
+      visaType,
+      britishPassport,
+      shareCode: britishPassport ? null : shareCode,
+      shareCodeExpiryDate: britishPassport ? null : shareCodeExpiryDate,
+      siaLicense: siaLicense || {},
+      bankAccounts: bankAccounts || [],
+      notes
+    });
+
+    await newGuard.save();
+    res.status(201).json({
+      success: true,
+      message: 'Guard created successfully',
+      data: newGuard
+    });
+  } catch (error) {
+    console.error('Error creating guard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating guard',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/guards/:id - Update guard
+ */
+app.put('/api/guards/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid guard ID'
+      });
+    }
+
+    const {
+      guardName,
+      email,
+      phoneNumber,
+      nationality,
+      visaType,
+      britishPassport,
+      shareCode,
+      shareCodeExpiryDate,
+      siaLicense,
+      bankAccounts,
+      isActive,
+      notes
+    } = req.body;
+
+    // Validate Share Code for non-British passport
+    if (!britishPassport && (!shareCode || !shareCodeExpiryDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Share code and expiry date required for non-British passport holders'
+      });
+    }
+
+    const updateData = {
+      guardName,
+      email,
+      phoneNumber,
+      nationality,
+      visaType,
+      britishPassport,
+      shareCode: britishPassport ? null : shareCode,
+      shareCodeExpiryDate: britishPassport ? null : shareCodeExpiryDate,
+      siaLicense: siaLicense || {},
+      bankAccounts: bankAccounts || [],
+      isActive,
+      notes
+    };
+
+    const guard = await GuardMaster.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Guard not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Guard updated successfully',
+      data: guard
+    });
+  } catch (error) {
+    console.error('Error updating guard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating guard',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/guards/:id - Delete guard
+ */
+app.delete('/api/guards/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid guard ID'
+      });
+    }
+
+    const guard = await GuardMaster.findByIdAndDelete(req.params.id);
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Guard not found'
+      });
+    }
+
+    // Also delete associated records
+    await MonthlyHours.deleteMany({ guardId: req.params.id });
+    await PayrollDeduction.deleteMany({ guardId: req.params.id });
+    await Alert.deleteMany({ guardId: req.params.id });
+
+    res.json({
+      success: true,
+      message: 'Guard and associated records deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting guard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting guard',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - MONTHLY HOURS ====================
+
+/**
+ * GET /api/monthly-hours - Get monthly hours records
+ */
+app.get('/api/monthly-hours', async (req, res) => {
+  try {
+    const { year, month, guardId } = req.query;
+    let query = {};
+
+    if (year) query.year = parseInt(year);
+    if (month) query.month = parseInt(month);
+    if (guardId) query.guardId = guardId;
+
+    const records = await MonthlyHours.find(query)
+      .populate('guardId', 'guardName email')
+      .sort({ year: -1, month: -1 });
+
+    res.json({
+      success: true,
+      data: records,
+      count: records.length
+    });
+  } catch (error) {
+    console.error('Error fetching monthly hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching monthly hours',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/monthly-hours - Create/Update monthly hours
+ */
+app.post('/api/monthly-hours', async (req, res) => {
+  try {
+    const { guardId, year, month, totalHours, totalMinutes, notes } = req.body;
+
+    if (!guardId || !year || !month || totalHours === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Check if guard exists
+    const guard = await GuardMaster.findById(guardId);
+    if (!guard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Guard not found'
+      });
+    }
+
+    // Check for existing monthly hours
+    let monthlyHours = await MonthlyHours.findOne({ guardId, year, month });
+
+    if (monthlyHours) {
+      // Update existing
+      monthlyHours.totalHours = totalHours;
+      monthlyHours.totalMinutes = totalMinutes || 0;
+      monthlyHours.notes = notes || '';
+      await monthlyHours.save();
+    } else {
+      // Create new
+      monthlyHours = new MonthlyHours({
+        guardId,
+        year,
+        month,
+        totalHours,
+        totalMinutes: totalMinutes || 0,
+        notes: notes || ''
+      });
+      await monthlyHours.save();
+    }
+
+    res.status(monthlyHours._id ? 200 : 201).json({
+      success: true,
+      message: monthlyHours._id ? 'Monthly hours updated' : 'Monthly hours created',
+      data: monthlyHours
+    });
+  } catch (error) {
+    console.error('Error saving monthly hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error saving monthly hours',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/monthly-hours/:id - Get single monthly hours record
+ */
+app.get('/api/monthly-hours/:id', async (req, res) => {
+  try {
+    const record = await MonthlyHours.findById(req.params.id).populate('guardId');
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Monthly hours record not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: record
+    });
+  } catch (error) {
+    console.error('Error fetching monthly hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching monthly hours',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/monthly-hours/:id - Delete monthly hours record
+ */
+app.delete('/api/monthly-hours/:id', async (req, res) => {
+  try {
+    const record = await MonthlyHours.findByIdAndDelete(req.params.id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Monthly hours record not found'
+      });
+    }
+
+    // Also delete associated payroll deductions
+    await PayrollDeduction.deleteMany({ monthlyHoursId: req.params.id });
+
+    res.json({
+      success: true,
+      message: 'Monthly hours record deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting monthly hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting monthly hours',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - PAYROLL DEDUCTIONS ====================
+
+/**
+ * POST /api/payroll-deductions - Process payroll deduction
+ */
+app.post('/api/payroll-deductions', async (req, res) => {
+  try {
+    const {
+      guardId,
+      year,
+      month,
+      deductedHours,
+      deductedMinutes,
+      paymentAmount,
+      paymentMethod,
+      bankAccountId,
+      reference,
+      notes
+    } = req.body;
+
+    if (!guardId || !year || !month || deductedHours === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Get monthly hours record
+    const monthlyHours = await MonthlyHours.findOne({ guardId, year, month });
+    if (!monthlyHours) {
+      return res.status(404).json({
+        success: false,
+        message: 'Monthly hours record not found for this guard/month'
+      });
+    }
+
+    // Check if deduction would exceed available hours
+    const totalAvailableMinutes = monthlyHours.totalHours * 60 + monthlyHours.totalMinutes;
+    const paidMinutes = monthlyHours.paidHours * 60 + monthlyHours.paidMinutes;
+    const deductMinutes = deductedHours * 60 + deductedMinutes;
+    const remainingMinutes = totalAvailableMinutes - paidMinutes;
+
+    if (deductMinutes > remainingMinutes) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot deduct ${deductedHours}h ${deductedMinutes}m. Only ${Math.floor(remainingMinutes / 60)}h ${remainingMinutes % 60}m remaining`,
+        remainingHours: Math.floor(remainingMinutes / 60),
+        remainingMinutes: remainingMinutes % 60
+      });
+    }
+
+    // Get payroll entry number
+    const lastDeduction = await PayrollDeduction.findOne({ guardId, year, month }).sort({ payrollEntryNumber: -1 });
+    const payrollEntryNumber = (lastDeduction?.payrollEntryNumber || 0) + 1;
+
+    // Create deduction record
+    const deduction = new PayrollDeduction({
+      guardId,
+      monthlyHoursId: monthlyHours._id,
+      year,
+      month,
+      payrollEntryNumber,
+      deductedHours,
+      deductedMinutes,
+      paymentAmount,
+      paymentMethod,
+      bankAccountId,
+      reference,
+      notes,
+      status: 'pending'
+    });
+
+    await deduction.save();
+
+    // Update monthly hours with paid amount
+    monthlyHours.paidHours += deductedHours;
+    monthlyHours.paidMinutes += deductedMinutes;
+    // Normalize minutes
+    if (monthlyHours.paidMinutes >= 60) {
+      monthlyHours.paidHours += Math.floor(monthlyHours.paidMinutes / 60);
+      monthlyHours.paidMinutes = monthlyHours.paidMinutes % 60;
+    }
+    await monthlyHours.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Payroll deduction processed successfully',
+      data: deduction
+    });
+  } catch (error) {
+    console.error('Error creating payroll deduction:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating payroll deduction',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/payroll-deductions - Get deductions
+ */
+app.get('/api/payroll-deductions', async (req, res) => {
+  try {
+    const { year, month, guardId, status } = req.query;
+    let query = {};
+
+    if (year) query.year = parseInt(year);
+    if (month) query.month = parseInt(month);
+    if (guardId) query.guardId = guardId;
+    if (status) query.status = status;
+
+    const deductions = await PayrollDeduction.find(query)
+      .populate('guardId', 'guardName email')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: deductions,
+      count: deductions.length
+    });
+  } catch (error) {
+    console.error('Error fetching deductions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching deductions',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/payroll-deductions/:id - Update deduction status
+ */
+app.put('/api/payroll-deductions/:id', async (req, res) => {
+  try {
+    const { status, paidDate, reference } = req.body;
+
+    const deduction = await PayrollDeduction.findByIdAndUpdate(
+      req.params.id,
+      {
+        status,
+        paidDate: status === 'paid' ? paidDate || new Date() : null,
+        reference
+      },
+      { new: true }
+    );
+
+    if (!deduction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deduction record not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Deduction updated successfully',
+      data: deduction
+    });
+  } catch (error) {
+    console.error('Error updating deduction:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating deduction',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/payroll-deductions/:id - Delete payroll deduction
+ */
+app.delete('/api/payroll-deductions/:id', async (req, res) => {
+  try {
+    const deduction = await PayrollDeduction.findByIdAndDelete(req.params.id);
+    if (!deduction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deduction record not found'
+      });
+    }
+
+    // Recalculate monthly hours remaining
+    if (deduction.monthlyHoursId) {
+      const monthlyHours = await MonthlyHours.findById(deduction.monthlyHoursId);
+      if (monthlyHours) {
+        monthlyHours.paidHours -= deduction.deductedHours;
+        monthlyHours.paidMinutes -= deduction.deductedMinutes;
+        
+        // Normalize
+        if (monthlyHours.paidMinutes < 0) {
+          monthlyHours.paidHours -= 1;
+          monthlyHours.paidMinutes += 60;
+        }
+        if (monthlyHours.paidHours < 0) {
+          monthlyHours.paidHours = 0;
+          monthlyHours.paidMinutes = 0;
+        }
+        
+        await monthlyHours.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Deduction deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting deduction:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting deduction',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - ALERTS ====================
+
+/**
+ * GET /api/alerts - Get alerts
+ */
+app.get('/api/alerts', async (req, res) => {
+  try {
+    const { guardId, isResolved, severity } = req.query;
+    let query = {};
+
+    if (guardId) query.guardId = guardId;
+    if (isResolved !== undefined) query.isResolved = isResolved === 'true';
+    if (severity) query.severity = severity;
+
+    const alerts = await Alert.find(query)
+      .populate('guardId', 'guardName email')
+      .sort({ severity: -1, createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: alerts,
+      count: alerts.length
+    });
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching alerts',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/alerts - Create alert (internal use)
+ */
+app.post('/api/alerts', async (req, res) => {
+  try {
+    const { guardId, alertType, severity, title, description, relatedData, actionUrl } = req.body;
+
+    const alert = new Alert({
+      guardId,
+      alertType,
+      severity: severity || 'warning',
+      title,
+      description,
+      relatedData,
+      actionUrl
+    });
+
+    await alert.save();
+    res.status(201).json({
+      success: true,
+      message: 'Alert created',
+      data: alert
+    });
+  } catch (error) {
+    console.error('Error creating alert:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating alert',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/alerts/:id - Mark alert as read/resolved
+ */
+app.put('/api/alerts/:id', async (req, res) => {
+  try {
+    const { isRead, isResolved, resolvedNotes } = req.body;
+
+    const updateData = {
+      isRead,
+      isResolved,
+      resolvedNotes: isResolved ? resolvedNotes : ''
+    };
+
+    if (isResolved) {
+      updateData.resolvedAt = new Date();
+    }
+
+    const alert = await Alert.findByIdAndUpdate(req.params.id, updateData, { new: true });
+
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alert not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Alert updated',
+      data: alert
+    });
+  } catch (error) {
+    console.error('Error updating alert:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating alert',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard-metrics - Get dashboard metrics
+ */
+app.get('/api/dashboard-metrics', async (req, res) => {
+  try {
+    const totalGuards = await GuardMaster.countDocuments({ isActive: true });
+    
+    // Get current month/year
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    const monthlyStats = await MonthlyHours.aggregate([
+      { $match: { year: currentYear, month: currentMonth } },
+      {
+        $group: {
+          _id: null,
+          totalHours: { $sum: '$totalHours' },
+          totalMinutes: { $sum: '$totalMinutes' },
+          paidHours: { $sum: '$paidHours' },
+          paidMinutes: { $sum: '$paidMinutes' }
+        }
+      }
+    ]);
+
+    const pendingPayrolls = await PayrollDeduction.countDocuments({ status: 'pending' });
+    
+    const expiringAlerts = await Alert.countDocuments({
+      alertType: 'expiring_share_code',
+      isResolved: false
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalGuards,
+        monthlyStats: monthlyStats[0] || {
+          totalHours: 0,
+          totalMinutes: 0,
+          paidHours: 0,
+          paidMinutes: 0
+        },
+        pendingPayrolls,
+        expiringAlerts,
+        currentMonth,
+        currentYear
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard metrics',
+      error: error.message
+    });
+  }
 });
 
 // ==================== API ROUTES - PAYROLL OPERATIONS ====================

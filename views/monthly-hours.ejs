@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Hours - Payroll System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .monthly-hours-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .monthly-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .monthly-header h1 {
+      margin: 0;
+      font-size: 2em;
+      color: #333;
+    }
+
+    .month-selector {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .month-selector input {
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .month-selector button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s;
+    }
+
+    .month-selector button:hover {
+      transform: translateY(-2px);
+    }
+
+    .content-section {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 1.3em;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .hours-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .hours-table th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .hours-table td {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .hours-table tr:hover {
+      background-color: #f9f9f9;
+    }
+
+    .hours-input {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .hours-input input {
+      width: 100px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      text-align: center;
+    }
+
+    .hours-unit {
+      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .guard-entry-form {
+      background-color: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group label {
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-add-hours {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      align-self: flex-end;
+    }
+
+    .btn-add-hours:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .hours-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+
+    .hours-info {
+      flex: 1;
+    }
+
+    .hours-info-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .hours-info-details {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .hours-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-card.warning {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .stat-card.success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .stat-unit {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 5px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-edit {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .btn-edit:hover {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .btn-delete {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .btn-delete:hover {
+      background-color: #c62828;
+      color: white;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+
+    .summary-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .summary-card {
+      background: white;
+      border: 2px solid #eee;
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    .summary-card-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .summary-row:last-child {
+      border-bottom: none;
+    }
+
+    .summary-label {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .summary-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      background-color: #4caf50;
+      color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      animation: slideInUp 0.3s;
+      z-index: 2000;
+    }
+
+    .toast.error {
+      background-color: #f44336;
+    }
+
+    @keyframes slideInUp {
+      from {
+        transform: translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="monthly-hours-container">
+    <!-- Header -->
+    <div class="monthly-header">
+      <h1>Monthly Hours Entry</h1>
+      <div class="month-selector">
+        <label for="monthInput" style="margin: 0; font-weight: 600;">Select Month:</label>
+        <input type="month" id="monthInput">
+        <button onclick="loadMonthlyData()">Load</button>
+      </div>
+    </div>
+
+    <!-- Entry Form -->
+    <div class="content-section">
+      <div class="section-title">Add Monthly Hours for Guard</div>
+      
+      <div class="guard-entry-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Select Guard *</label>
+            <select id="guardSelect" required>
+              <option value="">-- Select a Guard --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Total Hours *</label>
+            <input type="number" id="totalHours" min="0" max="744" step="1" placeholder="Hours" required>
+          </div>
+
+          <div class="form-group">
+            <label>Minutes</label>
+            <input type="number" id="totalMinutes" min="0" max="59" step="1" placeholder="Minutes" value="0">
+          </div>
+
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button type="button" class="btn-add-hours" onclick="addMonthlyHours()">Add Hours</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes (Optional)</label>
+          <textarea id="notes" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; min-height: 60px;"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly Hours List -->
+    <div class="content-section">
+      <div class="section-title">Hours for <span id="monthDisplay">Current Month</span></div>
+      <div id="hoursListContainer">
+        <div class="empty-state">
+          <p>Select a month to view hours entries.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly Summary -->
+    <div class="content-section">
+      <div class="section-title">Monthly Summary</div>
+      <div class="summary-section" id="summarySection">
+        <div class="summary-card">
+          <div class="summary-card-title">Total Hours Entered</div>
+          <div class="summary-row">
+            <span class="summary-label">Hours:</span>
+            <span class="summary-value" id="totalEnteredHours">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Minutes:</span>
+            <span class="summary-value" id="totalEnteredMinutes">0</span>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-title">Hours Paid</div>
+          <div class="summary-row">
+            <span class="summary-label">Hours:</span>
+            <span class="summary-value" id="totalPaidHours">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Minutes:</span>
+            <span class="summary-value" id="totalPaidMinutes">0</span>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-title">Remaining Hours</div>
+          <div class="summary-row">
+            <span class="summary-label">Hours:</span>
+            <span class="summary-value" id="totalRemainingHours">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Minutes:</span>
+            <span class="summary-value" id="totalRemainingMinutes">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentMonth = new Date();
+    let guardsData = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set current month in input
+      const today = new Date();
+      const monthStr = today.toISOString().slice(0, 7);
+      document.getElementById('monthInput').value = monthStr;
+      document.getElementById('monthInput').addEventListener('change', loadMonthlyData);
+
+      // Load guards
+      loadGuards();
+      loadMonthlyData();
+    });
+
+    async function loadGuards() {
+      try {
+        const response = await fetch('/api/guards?isActive=true');
+        const result = await response.json();
+
+        if (result.success) {
+          guardsData = result.data;
+          const select = document.getElementById('guardSelect');
+          select.innerHTML = '<option value="">-- Select a Guard --</option>' +
+            result.data.map(g => `<option value="${g._id}">${g.guardName}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('Error loading guards:', error);
+      }
+    }
+
+    async function loadMonthlyData() {
+      try {
+        const monthInput = document.getElementById('monthInput').value;
+        if (!monthInput) return;
+
+        const [year, month] = monthInput.split('-');
+        currentMonth = new Date(year, parseInt(month) - 1);
+
+        // Format month display
+        const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        document.getElementById('monthDisplay').textContent = monthName;
+
+        const response = await fetch(`/api/monthly-hours?year=${year}&month=${month}`);
+        const result = await response.json();
+
+        if (result.success) {
+          displayMonthlyHours(result.data);
+          calculateSummary(result.data);
+        }
+      } catch (error) {
+        console.error('Error loading monthly data:', error);
+        showToast('Error loading monthly data', 'error');
+      }
+    }
+
+    function displayMonthlyHours(hours) {
+      const container = document.getElementById('hoursListContainer');
+
+      if (hours.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No hours entered for this month yet.</p></div>';
+        return;
+      }
+
+      container.innerHTML = hours.map(h => {
+        const guard = guardsData.find(g => g._id === h.guardId);
+        const guardName = guard ? guard.guardName : 'Unknown Guard';
+        const totalHours = h.totalHours + (h.totalMinutes / 60);
+        const remaining = h.remainingHours + (h.remainingMinutes / 60);
+
+        return `
+          <div class="hours-row">
+            <div class="hours-info">
+              <div class="hours-info-title">${guardName}</div>
+              <div class="hours-info-details">
+                Entered: ${h.totalHours}h ${h.totalMinutes}m | 
+                Paid: ${h.paidHours}h ${h.paidMinutes}m | 
+                Remaining: ${h.remainingHours}h ${h.remainingMinutes}m
+              </div>
+              ${h.notes ? `<div class="hours-info-details" style="margin-top: 5px; color: #999;">${h.notes}</div>` : ''}
+            </div>
+            <div class="action-buttons">
+              <button class="btn-icon btn-edit" onclick="editMonthlyHours('${h._id}')">Edit</button>
+              <button class="btn-icon btn-delete" onclick="deleteMonthlyHours('${h._id}')">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function calculateSummary(hours) {
+      let totalHours = 0, totalMinutes = 0;
+      let paidHours = 0, paidMinutes = 0;
+      let remainingHours = 0, remainingMinutes = 0;
+
+      hours.forEach(h => {
+        totalHours += h.totalHours;
+        totalMinutes += h.totalMinutes;
+        paidHours += h.paidHours;
+        paidMinutes += h.paidMinutes;
+        remainingHours += h.remainingHours;
+        remainingMinutes += h.remainingMinutes;
+      });
+
+      // Normalize minutes
+      totalHours += Math.floor(totalMinutes / 60);
+      totalMinutes = totalMinutes % 60;
+
+      paidHours += Math.floor(paidMinutes / 60);
+      paidMinutes = paidMinutes % 60;
+
+      remainingHours += Math.floor(remainingMinutes / 60);
+      remainingMinutes = remainingMinutes % 60;
+
+      document.getElementById('totalEnteredHours').textContent = totalHours;
+      document.getElementById('totalEnteredMinutes').textContent = totalMinutes;
+      document.getElementById('totalPaidHours').textContent = paidHours;
+      document.getElementById('totalPaidMinutes').textContent = paidMinutes;
+      document.getElementById('totalRemainingHours').textContent = remainingHours;
+      document.getElementById('totalRemainingMinutes').textContent = remainingMinutes;
+    }
+
+    async function addMonthlyHours() {
+      const guardId = document.getElementById('guardSelect').value;
+      const totalHours = parseInt(document.getElementById('totalHours').value);
+      const totalMinutes = parseInt(document.getElementById('totalMinutes').value) || 0;
+      const notes = document.getElementById('notes').value;
+      const monthInput = document.getElementById('monthInput').value;
+
+      if (!guardId) {
+        showToast('Please select a guard', 'error');
+        return;
+      }
+
+      if (!monthInput) {
+        showToast('Please select a month', 'error');
+        return;
+      }
+
+      if (isNaN(totalHours) || totalHours < 0) {
+        showToast('Please enter valid hours', 'error');
+        return;
+      }
+
+      try {
+        const [year, month] = monthInput.split('-');
+        const response = await fetch('/api/monthly-hours', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guardId,
+            year: parseInt(year),
+            month: parseInt(month),
+            totalHours,
+            totalMinutes,
+            notes
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast('Hours added successfully', 'success');
+          document.getElementById('totalHours').value = '';
+          document.getElementById('totalMinutes').value = '0';
+          document.getElementById('notes').value = '';
+          document.getElementById('guardSelect').value = '';
+          loadMonthlyData();
+        } else {
+          showToast(result.message || 'Error adding hours', 'error');
+        }
+      } catch (error) {
+        console.error('Error adding hours:', error);
+        showToast('Error adding hours', 'error');
+      }
+    }
+
+    async function deleteMonthlyHours(id) {
+      if (!confirm('Are you sure you want to delete this entry?')) return;
+
+      try {
+        const response = await fetch(`/api/monthly-hours/${id}`, { method: 'DELETE' });
+        // Add DELETE endpoint to app.js
+        const result = await response.json();
+        if (result.success) {
+          showToast('Hours deleted successfully', 'success');
+          loadMonthlyData();
+        }
+      } catch (error) {
+        console.error('Error deleting hours:', error);
+      }
+    }
+
+    function editMonthlyHours(id) {
+      // Navigate to edit modal or inline edit
+      console.log('Edit monthly hours:', id);
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => toast.remove(), 3000);
+    }
+  </script>
+</body>
+</html>
