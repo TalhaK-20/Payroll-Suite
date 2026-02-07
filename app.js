@@ -10,6 +10,9 @@ const { body, validationResult } = require('express-validator');
 const Payroll = require('./models/Payroll');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
+const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
+const EnhancedExcelGenerator = require('./utils/enhancedExcelGenerator');
+const payrollValidation = require('./utils/payrollValidation');
 
 // Initialize Express app
 const app = express();
@@ -73,33 +76,9 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // ==================== VALIDATION MIDDLEWARE ====================
 
-const payrollValidationRules = () => {
-  return [
-    body('clientName').trim().notEmpty().withMessage('Client Name is required'),
-    body('guardName').trim().notEmpty().withMessage('Guard Name is required'),
-    body('totalHours').isFloat({ min: 0 }).withMessage('Total Hours must be a positive number'),
-    body('payRate').isFloat({ min: 0 }).withMessage('Pay Rate must be a positive number'),
-    body('chargeRate').isFloat({ min: 0 }).withMessage('Charge Rate must be a positive number'),
-    body('pay1').isFloat({ min: 0 }).withMessage('Pay 1 must be a positive number'),
-    body('pay2').isFloat({ min: 0 }).withMessage('Pay 2 must be a positive number'),
-    body('pay3').isFloat({ min: 0 }).withMessage('Pay 3 must be a positive number'),
-    body('accountNo').trim().notEmpty().withMessage('Account Number is required'),
-    body('sortCode').trim().notEmpty().withMessage('Sort Code is required'),
-    body('accountHolderName').trim().notEmpty().withMessage('Account Holder Name is required')
-  ];
-};
-
-const validate = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: errors.array()
-    });
-  }
-  next();
-};
+// Use enhanced validation rules from utility
+const payrollValidationRules = payrollValidation.payrollValidationRules;
+const validate = payrollValidation.validate;
 
 // ==================== PAGE ROUTES ====================
 
@@ -147,25 +126,29 @@ app.get('/api/payroll/filter', async (req, res) => {
   try {
     const query = {};
 
-    // Client name filter
-    if (req.query.clientName) {
-      query.clientName = { $regex: req.query.clientName, $options: 'i' };
-    }
-
     // Guard name filter
     if (req.query.guardName) {
       query.guardName = { $regex: req.query.guardName, $options: 'i' };
     }
 
-    // Hours range filter
-    if (req.query.minHours || req.query.maxHours) {
-      query.totalHours = {};
-      if (req.query.minHours) {
-        query.totalHours.$gte = parseFloat(req.query.minHours);
-      }
-      if (req.query.maxHours) {
-        query.totalHours.$lte = parseFloat(req.query.maxHours);
-      }
+    // Insurance number filter (new)
+    if (req.query.insuranceNumber) {
+      query.insuranceNumber = { $regex: req.query.insuranceNumber, $options: 'i' };
+    }
+
+    // Visa status filter (new)
+    if (req.query.visaStatus) {
+      query.visaStatus = req.query.visaStatus;
+    }
+
+    // Nationality filter (new)
+    if (req.query.nationality) {
+      query.nationality = { $regex: req.query.nationality, $options: 'i' };
+    }
+
+    // Client name filter (legacy)
+    if (req.query.clientName) {
+      query.clientName = { $regex: req.query.clientName, $options: 'i' };
     }
 
     const records = await Payroll.find(query).sort({ createdAt: -1 });
@@ -226,15 +209,47 @@ app.get('/api/payroll/:id', async (req, res) => {
  */
 app.post('/api/payroll', payrollValidationRules(), validate, async (req, res) => {
   try {
+    // Parse bank accounts
+    let bankAccounts = [];
+    if (req.body.bankAccounts && typeof req.body.bankAccounts === 'string') {
+      try {
+        bankAccounts = JSON.parse(req.body.bankAccounts);
+      } catch (e) {
+        console.log('Bank accounts parse error, using empty array');
+      }
+    } else if (Array.isArray(req.body.bankAccounts)) {
+      bankAccounts = req.body.bankAccounts;
+    }
+
     const payrollData = {
+      // Basic info
       clientName: req.body.clientName,
       guardName: req.body.guardName,
-      totalHours: parseFloat(req.body.totalHours),
-      payRate: parseFloat(req.body.payRate),
-      chargeRate: parseFloat(req.body.chargeRate),
-      pay1: parseFloat(req.body.pay1),
-      pay2: parseFloat(req.body.pay2),
-      pay3: parseFloat(req.body.pay3),
+      siteName: req.body.siteName,
+      
+      // Visa information
+      nationality: req.body.nationality,
+      insuranceNumber: req.body.insuranceNumber,
+      visaStatus: req.body.visaStatus,
+      britishPassport: req.body.britishPassport === 'true' || req.body.britishPassport === true,
+      shareCode: req.body.shareCode,
+      shareCodeExpiryDate: req.body.shareCodeExpiryDate,
+      
+      // Hours
+      totalHours: parseFloat(req.body.totalHours) || 0,
+      totalMinutes: parseInt(req.body.totalMinutes) || 0,
+      
+      // Rates
+      payRate: parseFloat(req.body.payRate) || 0,
+      chargeRate: parseFloat(req.body.chargeRate) || 0,
+      
+      // Bank accounts
+      bankAccounts: bankAccounts,
+      
+      // Legacy fields for compatibility
+      pay1: parseFloat(req.body.pay1) || 0,
+      pay2: parseFloat(req.body.pay2) || 0,
+      pay3: parseFloat(req.body.pay3) || 0,
       accountNo: req.body.accountNo,
       sortCode: req.body.sortCode,
       accountHolderName: req.body.accountHolderName
@@ -271,17 +286,38 @@ app.put('/api/payroll/:id', payrollValidationRules(), validate, async (req, res)
     }
 
     const updateData = {
+      // Basic info
       clientName: req.body.clientName,
       guardName: req.body.guardName,
-      totalHours: parseFloat(req.body.totalHours),
-      payRate: parseFloat(req.body.payRate),
-      chargeRate: parseFloat(req.body.chargeRate),
-      pay1: parseFloat(req.body.pay1),
-      pay2: parseFloat(req.body.pay2),
-      pay3: parseFloat(req.body.pay3),
+      siteName: req.body.siteName,
+      
+      // Visa information
+      nationality: req.body.nationality,
+      insuranceNumber: req.body.insuranceNumber,
+      visaStatus: req.body.visaStatus,
+      britishPassport: req.body.britishPassport === 'true' || req.body.britishPassport === true,
+      shareCode: req.body.shareCode,
+      shareCodeExpiryDate: req.body.shareCodeExpiryDate,
+      
+      // Hours
+      totalHours: parseFloat(req.body.totalHours) || 0,
+      totalMinutes: parseInt(req.body.totalMinutes) || 0,
+      
+      // Rates
+      payRate: parseFloat(req.body.payRate) || 0,
+      chargeRate: parseFloat(req.body.chargeRate) || 0,
+      
+      // Bank accounts
+      bankAccounts: req.body.bankAccounts ? (typeof req.body.bankAccounts === 'string' ? JSON.parse(req.body.bankAccounts) : req.body.bankAccounts) : [],
+      
+      // Legacy fields for compatibility
+      pay1: parseFloat(req.body.pay1) || 0,
+      pay2: parseFloat(req.body.pay2) || 0,
+      pay3: parseFloat(req.body.pay3) || 0,
       accountNo: req.body.accountNo,
       sortCode: req.body.sortCode,
       accountHolderName: req.body.accountHolderName,
+      
       updatedAt: new Date()
     };
 
@@ -531,6 +567,114 @@ app.post('/api/export/excel', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error exporting Excel',
+      error: error.message
+    });
+  }
+});
+
+// ==================== API ROUTES - ENHANCED EXPORTS ====================
+
+/**
+ * POST /api/export/enhanced-pdf - Export with enhanced PDF including visa information
+ */
+app.post('/api/export/enhanced-pdf', async (req, res) => {
+  try {
+    const records = await Payroll.find().sort({ createdAt: -1 });
+
+    if (records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No records to export'
+      });
+    }
+
+    const generator = new EnhancedPdfGenerator();
+    const pdfBuffer = await generator.generatePayrollPDF(records);
+
+    const filename = `payroll_enhanced_${Date.now()}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error exporting enhanced PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting enhanced PDF',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/export/enhanced-excel - Export with enhanced Excel (4 sheets)
+ */
+app.post('/api/export/enhanced-excel', async (req, res) => {
+  try {
+    const records = await Payroll.find().sort({ createdAt: -1 });
+
+    if (records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No records to export'
+      });
+    }
+
+    const generator = new EnhancedExcelGenerator();
+    const excelBuffer = await generator.generatePayrollExcel(records);
+
+    const filename = `payroll_enhanced_${Date.now()}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error exporting enhanced Excel:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting enhanced Excel',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/export/payroll-pdf/:id - Export single record as enhanced PDF
+ */
+app.post('/api/export/payroll-pdf/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ID format'
+      });
+    }
+
+    const record = await Payroll.findById(req.params.id);
+    
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Record not found'
+      });
+    }
+
+    const generator = new EnhancedPdfGenerator();
+    const pdfBuffer = await generator.generatePayrollPDF([record]);
+
+    const filename = `payroll_${record.guardName}_${Date.now()}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error exporting payroll PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting payroll PDF',
       error: error.message
     });
   }

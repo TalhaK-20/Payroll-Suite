@@ -121,33 +121,24 @@ function displayPayrollTable(payrollData) {
     return;
   }
 
-  tableBody.innerHTML = payrollData.map(item => `
+  tableBody.innerHTML = payrollData.map(item => {
+    const totalHoursDecimal = (item.totalHours || 0) + ((item.totalMinutes || 0) / 60);
+    const totalPay = totalHoursDecimal * (item.payRate || 0);
+    const bankAccountCount = (item.bankAccounts && item.bankAccounts.length) ? item.bankAccounts.length : 0;
+    
+    return `
     <tr data-id="${item._id}">
-      <td>${item.clientName}</td>
-      <td>${item.guardName}</td>
-      <td>${item.totalHours}</td>
-      <td>£${item.payRate.toFixed(2)}</td>
-      <td>£${item.chargeRate.toFixed(2)}</td>
-      <td>£${item.pay1.toFixed(2)}</td>
-      <td>£${item.pay2.toFixed(2)}</td>
-      <td>£${item.pay3.toFixed(2)}</td>
-      <td>${item.accountNo}</td>
-      <td>${item.sortCode}</td>
+      <td><strong>${item.guardName || '-'}</strong></td>
+      <td>${item.nationality || '-'}</td>
+      <td>${item.insuranceNumber || '-'}</td>
+      <td>${item.visaStatus || '-'}</td>
+      <td>${item.totalHours || 0}:${String(item.totalMinutes || 0).padStart(2, '0')}</td>
+      <td>£${(item.payRate || 0).toFixed(2)}</td>
+      <td><span class="badge">${bankAccountCount}</span></td>
       <td>
-        <div class="btn-group-vertical payroll-buttons">
-          <button class="btn btn-info btn-xs" onclick="generatePayrollPDF('${item._id}', 1, '${item.guardName}')" title="Generate Payroll 1">
-            📄 Pay 1
-          </button>
-          <button class="btn btn-info btn-xs" onclick="generatePayrollPDF('${item._id}', 2, '${item.guardName}')" title="Generate Payroll 2">
-            📄 Pay 2
-          </button>
-          <button class="btn btn-info btn-xs" onclick="generatePayrollPDF('${item._id}', 3, '${item.guardName}')" title="Generate Payroll 3">
-            📄 Pay 3
-          </button>
-          <button class="btn btn-warning btn-xs" onclick="generatePayrollCombined('${item._id}', '${item.guardName}')" title="Generate Combined PDF">
-            📋 Combined
-          </button>
-        </div>
+        <button class="btn btn-sm btn-primary" onclick="exportPayrollPDF('${item._id}', '${item.guardName}')" title="Generate Enhanced PDF">
+          📄 PDF
+        </button>
       </td>
       <td>
         <div class="btn-group-vertical">
@@ -160,7 +151,8 @@ function displayPayrollTable(payrollData) {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ==================== FORM HANDLING ====================
@@ -305,25 +297,125 @@ async function editPayroll(id) {
 
     if (data.success) {
       const item = data.data;
-      document.getElementById('id').value = item._id;
-      document.getElementById('clientName').value = item.clientName;
-      document.getElementById('guardName').value = item.guardName;
-      document.getElementById('totalHours').value = item.totalHours;
-      document.getElementById('payRate').value = item.payRate;
-      document.getElementById('chargeRate').value = item.chargeRate;
-      document.getElementById('pay1').value = item.pay1;
-      document.getElementById('pay2').value = item.pay2;
-      document.getElementById('pay3').value = item.pay3;
-      document.getElementById('accountNo').value = item.accountNo;
-      document.getElementById('sortCode').value = item.sortCode;
-      document.getElementById('accountHolderName').value = item.accountHolderName;
+      
+      // Helper function to safely set element value
+      const setElementValue = (elemId, value) => {
+        const elem = document.getElementById(elemId);
+        if (elem) {
+          if (elem.type === 'checkbox') {
+            elem.checked = value || false;
+          } else {
+            elem.value = value || '';
+          }
+        }
+      };
+      
+      // Basic info
+      setElementValue('id', item._id);
+      setElementValue('clientName', item.clientName);
+      setElementValue('guardName', item.guardName);
+      setElementValue('siteName', item.siteName);
+      
+      // Visa information
+      setElementValue('nationality', item.nationality);
+      setElementValue('insuranceNumber', item.insuranceNumber);
+      setElementValue('visaStatus', item.visaStatus);
+      setElementValue('britishPassport', item.britishPassport);
+      setElementValue('shareCode', item.shareCode);
+      setElementValue('shareCodeExpiryDate', item.shareCodeExpiryDate);
+      
+      // Hours
+      setElementValue('totalHours', item.totalHours || 0);
+      setElementValue('totalMinutes', item.totalMinutes || 0);
+      
+      // Rates
+      setElementValue('payRate', item.payRate || 0);
+      setElementValue('chargeRate', item.chargeRate || 0);
+      
+      // Legacy fields
+      setElementValue('pay1', item.pay1 || 0);
+      setElementValue('pay2', item.pay2 || 0);
+      setElementValue('pay3', item.pay3 || 0);
+      setElementValue('accountNo', item.accountNo);
+      setElementValue('sortCode', item.sortCode);
+      setElementValue('accountHolderName', item.accountHolderName);
+      
+      // Bank accounts (clear and repopulate)
+      const bankContainer = document.getElementById('bankAccountsContainer');
+      if (bankContainer && item.bankAccounts && item.bankAccounts.length > 0) {
+        bankContainer.innerHTML = '';
+        item.bankAccounts.forEach((account, index) => {
+          const accountCard = document.createElement('div');
+          accountCard.className = 'bank-account-card';
+          accountCard.innerHTML = `
+            <div class="form-row">
+              <input type="text" placeholder="Account Holder Name" value="${account.accountHolderName || ''}" class="account-holder-name-${index}">
+              <input type="text" placeholder="Bank Name" value="${account.bankName || ''}" class="bank-name-${index}">
+            </div>
+            <div class="form-row">
+              <input type="text" placeholder="Sort Code (XX-XX-XX)" value="${account.sortCode || ''}" class="sort-code-${index}">
+              <input type="text" placeholder="Account Number" value="${account.accountNumber || ''}" class="account-number-${index}">
+            </div>
+            <div class="form-row">
+              <label>
+                <input type="checkbox" class="is-primary-${index}" ${account.isPrimary ? 'checked' : ''}>
+                Is Primary Account
+              </label>
+              <label>
+                <input type="checkbox" class="is-active-${index}" ${account.active ? 'checked' : ''}>
+                Active
+              </label>
+              ${index > 0 ? `<button type="button" class="btn btn-sm btn-danger" onclick="removeBankAccount(${index})">Remove</button>` : ''}
+            </div>
+          `;
+          bankContainer.appendChild(accountCard);
+        });
+      }
 
-      document.getElementById('formModalTitle').textContent = 'Edit Payroll Record';
-      document.getElementById('formModal').classList.add('active');
+      // Open modal
+      const titleElem = document.getElementById('formModalTitle');
+      const modalElem = document.getElementById('formModal');
+      if (titleElem) titleElem.textContent = 'Edit Payroll Record';
+      if (modalElem) {
+        modalElem.classList.add('active');
+        // Scroll to top of modal
+        setTimeout(() => {
+          modalElem.scrollTop = 0;
+        }, 100);
+      }
+      
+      // Toggle share code fields if needed
+      if (typeof toggleShareCodeFields === 'function') {
+        toggleShareCodeFields();
+      }
+    } else {
+      showAlert('Record not found', 'warning');
+    }
+  } catch (error) {
+    console.error('Error loading record:', error);
+    showAlert('Error loading record: ' + error.message, 'danger');
+  }
+}
+
+async function exportPayrollPDF(id, guardName) {
+  try {
+    const response = await fetch(`/api/export/payroll-pdf/${id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const blob = await response.blob();
+      downloadFile(blob, `payroll_${guardName}_${new Date().getTime()}.pdf`);
+      showAlert(`PDF exported for ${guardName}`, 'success');
+    } else {
+      showAlert('Error exporting PDF', 'danger');
     }
   } catch (error) {
     console.error('Error:', error);
-    showAlert('Error loading record', 'danger');
+    showAlert('Error exporting PDF', 'danger');
   }
 }
 
@@ -363,16 +455,21 @@ function initializeFilters() {
 }
 
 async function applyFilters() {
-  const clientName = document.getElementById('filterClient')?.value || '';
+  // New filters
   const guardName = document.getElementById('filterGuard')?.value || '';
-  const minHours = document.getElementById('filterMinHours')?.value || '';
-  const maxHours = document.getElementById('filterMaxHours')?.value || '';
+  const insuranceNumber = document.getElementById('filterInsurance')?.value || '';
+  const visaStatus = document.getElementById('filterVisa')?.value || '';
+  const nationality = document.getElementById('filterNationality')?.value || '';
+  
+  // Legacy filter (still supported)
+  const clientName = document.getElementById('filterClient')?.value || '';
 
   const params = new URLSearchParams();
-  if (clientName) params.append('clientName', clientName);
   if (guardName) params.append('guardName', guardName);
-  if (minHours) params.append('minHours', minHours);
-  if (maxHours) params.append('maxHours', maxHours);
+  if (insuranceNumber) params.append('insuranceNumber', insuranceNumber);
+  if (visaStatus) params.append('visaStatus', visaStatus);
+  if (nationality) params.append('nationality', nationality);
+  if (clientName) params.append('clientName', clientName);
 
   try {
     const response = await fetch(`/api/payroll/filter?${params}`);
@@ -391,10 +488,17 @@ async function applyFilters() {
 }
 
 function resetFilters() {
-  document.getElementById('filterClient').value = '';
+  // New filters
   document.getElementById('filterGuard').value = '';
-  document.getElementById('filterMinHours').value = '';
-  document.getElementById('filterMaxHours').value = '';
+  document.getElementById('filterInsurance').value = '';
+  document.getElementById('filterVisa').value = '';
+  document.getElementById('filterNationality').value = '';
+  
+  // Legacy filter
+  if (document.getElementById('filterClient')) {
+    document.getElementById('filterClient').value = '';
+  }
+  
   loadPayrollData();
   showAlert('Filters reset', 'info');
 }
@@ -403,7 +507,7 @@ function resetFilters() {
 
 async function exportToPDF() {
   try {
-    const response = await fetch('/api/export/pdf', {
+    const response = await fetch('/api/export/enhanced-pdf', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -412,8 +516,8 @@ async function exportToPDF() {
 
     if (response.ok) {
       const blob = await response.blob();
-      downloadFile(blob, `payroll_${new Date().getTime()}.pdf`);
-      showAlert('PDF exported successfully', 'success');
+      downloadFile(blob, `payroll_enhanced_${new Date().getTime()}.pdf`);
+      showAlert('Enhanced PDF exported successfully', 'success');
     } else {
       showAlert('Error exporting PDF', 'danger');
     }
@@ -425,7 +529,7 @@ async function exportToPDF() {
 
 async function exportToExcel() {
   try {
-    const response = await fetch('/api/export/excel', {
+    const response = await fetch('/api/export/enhanced-excel', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -434,8 +538,8 @@ async function exportToExcel() {
 
     if (response.ok) {
       const blob = await response.blob();
-      downloadFile(blob, `payroll_${new Date().getTime()}.xlsx`);
-      showAlert('Excel file exported successfully', 'success');
+      downloadFile(blob, `payroll_enhanced_${new Date().getTime()}.xlsx`);
+      showAlert('Enhanced Excel file (4 sheets) exported successfully', 'success');
     } else {
       showAlert('Error exporting Excel', 'danger');
     }

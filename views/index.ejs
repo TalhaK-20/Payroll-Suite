@@ -56,20 +56,30 @@
         <div class="filter-title">🔍 Advanced Filters</div>
         <div class="filter-grid">
           <div class="filter-input">
-            <label>Client Name</label>
-            <input type="text" id="filterClient" placeholder="Search by client name">
-          </div>
-          <div class="filter-input">
             <label>Guard Name</label>
             <input type="text" id="filterGuard" placeholder="Search by guard name">
           </div>
           <div class="filter-input">
-            <label>Min Hours</label>
-            <input type="number" id="filterMinHours" placeholder="Minimum hours" min="0">
+            <label>Insurance Number</label>
+            <input type="text" id="filterInsurance" placeholder="Search by insurance no">
           </div>
           <div class="filter-input">
-            <label>Max Hours</label>
-            <input type="number" id="filterMaxHours" placeholder="Maximum hours" min="0">
+            <label>Visa Status</label>
+            <select id="filterVisa">
+              <option value="">-- All Visa Status --</option>
+              <option value="Student">Student</option>
+              <option value="Skilled Worker">Skilled Worker</option>
+              <option value="PSW">PSW</option>
+              <option value="Dependent/Spouse">Dependent/Spouse</option>
+              <option value="Permanent Resident">Permanent Resident</option>
+              <option value="Settled Status">Settled Status</option>
+              <option value="Pre-Settled Status">Pre-Settled Status</option>
+              <option value="Refugee/Asylum">Refugee/Asylum</option>
+            </select>
+          </div>
+          <div class="filter-input">
+            <label>Nationality</label>
+            <input type="text" id="filterNationality" placeholder="Search by nationality">
           </div>
         </div>
         <div class="filter-actions">
@@ -83,23 +93,20 @@
         <table>
           <thead>
             <tr>
-              <th>Client Name</th>
               <th>Guard Name</th>
-              <th>Total Hours</th>
+              <th>Nationality</th>
+              <th>Insurance #</th>
+              <th>Visa Status</th>
+              <th>Hours:Min</th>
               <th>Pay Rate</th>
-              <th>Charge Rate</th>
-              <th>Pay 1</th>
-              <th>Pay 2</th>
-              <th>Pay 3</th>
-              <th>Account No</th>
-              <th>Sort Code</th>
-              <th>📄 Generate Payroll</th>
+              <th>Bank Accounts</th>
+              <th>📄 Generate</th>
               <th>⚙️ Manage</th>
             </tr>
           </thead>
           <tbody id="payrollTableBody">
             <tr>
-              <td colspan="11" class="text-center">
+              <td colspan="9" class="text-center">
                 <div class="spinner">
                   <div class="loading"></div>
                   <span>Loading records...</span>
@@ -114,111 +121,186 @@
 
   <!-- Form Modal -->
   <div id="formModal" class="modal">
-    <div class="modal-content modal-professional">
-      <div class="modal-header-professional">
+    <div class="modal-content modal-professional" style="max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header-professional" style="position: sticky; top: 0; background: white; z-index: 100;">
         <div class="modal-title-section">
           <div class="modal-icon">📋</div>
           <div>
             <h2 id="formModalTitle">Add New Payroll Record</h2>
-            <p class="modal-subtitle">Enter employee and payment information</p>
+            <p class="modal-subtitle">Enter complete guard and payment information</p>
           </div>
         </div>
-        <button class="modal-close-btn">✕</button>
+        <button class="modal-close-btn" onclick="closeFormModal()">✕</button>
       </div>
       
       <form id="payrollForm">
         <input type="hidden" id="id" name="id">
         
-        <!-- Employee Information Section -->
+        <!-- SECTION 1: Guard Basic Information -->
         <div class="form-section">
-          <h3 class="section-title">👤 Employee Information</h3>
+          <h3 class="section-title">👤 Guard Basic Information</h3>
           <div class="form-row-2col">
-            <div class="form-group">
-              <label>Client Name <span class="required">*</span></label>
-              <input type="text" id="clientName" name="clientName" placeholder="e.g., ABC Security Ltd" required>
-              <small class="field-hint">Company or client name</small>
-            </div>
             <div class="form-group">
               <label>Guard Name <span class="required">*</span></label>
               <input type="text" id="guardName" name="guardName" placeholder="e.g., John Smith" required>
               <small class="field-hint">Employee's full name</small>
             </div>
+            <div class="form-group">
+              <label>Nationality <span class="required">*</span></label>
+              <input type="text" id="nationality" name="nationality" placeholder="e.g., British, Indian, Pakistani" required>
+              <small class="field-hint">Country of origin</small>
+            </div>
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Insurance Number <span class="required">*</span></label>
+              <input type="text" id="insuranceNumber" name="insuranceNumber" placeholder="e.g., AB 123 456 C" required>
+              <small class="field-hint">National Insurance: AB 123 456 C</small>
+            </div>
+            <div class="form-group">
+              <label>Site Name</label>
+              <input type="text" id="siteName" name="siteName" placeholder="e.g., Arnold Laver Peterborough">
+              <small class="field-hint">Work location (optional)</small>
+            </div>
           </div>
         </div>
 
-        <!-- Working Hours Section -->
+        <!-- SECTION 2: Immigration & Visa Status -->
         <div class="form-section">
-          <h3 class="section-title">⏰ Working Hours & Rates</h3>
+          <h3 class="section-title">🛂 Immigration & Visa Status</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Visa Status <span class="required">*</span></label>
+              <select id="visaStatus" name="visaStatus" required onchange="toggleShareCodeFields()">
+                <option value="">-- Select Visa Status --</option>
+                <option value="Student">Student</option>
+                <option value="Skilled Worker">Skilled Worker</option>
+                <option value="PSW">PSW (Points-Based System)</option>
+                <option value="Dependent/Spouse">Dependent/Spouse</option>
+                <option value="Permanent Resident">Permanent Resident</option>
+                <option value="Settled Status">Settled Status</option>
+                <option value="Pre-Settled Status">Pre-Settled Status</option>
+                <option value="Refugee/Asylum">Refugee/Asylum Seeker</option>
+              </select>
+              <small class="field-hint">Immigration status classification</small>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="britishPassport" name="britishPassport" onchange="toggleShareCodeFields()">
+                British Passport Holder
+              </label>
+              <small class="field-hint">Check if has British passport</small>
+            </div>
+          </div>
+          
+          <!-- Share Code Fields (shown only if NOT British Passport) -->
+          <div id="shareCodeContainer" style="display: none;">
+            <div class="form-row-2col">
+              <div class="form-group">
+                <label>Share Code <span class="required">*</span></label>
+                <input type="text" id="shareCode" name="shareCode" placeholder="Enter share code">
+                <small class="field-hint">Required for non-British passport holders</small>
+              </div>
+              <div class="form-group">
+                <label>Share Code Expiry Date <span class="required">*</span></label>
+                <input type="date" id="shareCodeExpiryDate" name="shareCodeExpiryDate">
+                <small class="field-hint">When share code expires</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: Client Information -->
+        <div class="form-section">
+          <h3 class="section-title">🏢 Client Information</h3>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Client Name <span class="required">*</span></label>
+              <input type="text" id="clientName" name="clientName" placeholder="e.g., SES Security" required>
+              <small class="field-hint">Company/client name</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4: Working Hours -->
+        <div class="form-section">
+          <h3 class="section-title">⏰ Working Hours</h3>
           <div class="form-row-2col">
             <div class="form-group">
               <label>Total Hours <span class="required">*</span></label>
-              <input type="number" id="totalHours" name="totalHours" step="0.5" min="0" placeholder="e.g., 40" required>
-              <small class="field-hint">Hours worked this period</small>
+              <input type="number" id="totalHours" name="totalHours" min="0" placeholder="e.g., 40" required onchange="calculateTotalPay()">
+              <small class="field-hint">Number of hours worked</small>
             </div>
             <div class="form-group">
-              <label>Pay Rate <span class="currency">£/hour</span> <span class="required">*</span></label>
-              <input type="number" id="payRate" name="payRate" step="0.01" min="0" placeholder="e.g., 12.50" required>
-              <small class="field-hint">Hourly pay rate</small>
+              <label>Total Minutes <span class="required">*</span></label>
+              <input type="number" id="totalMinutes" name="totalMinutes" min="0" max="59" placeholder="e.g., 30" required onchange="calculateTotalPay()">
+              <small class="field-hint">Minutes (0-59)</small>
             </div>
           </div>
+        </div>
+
+        <!-- SECTION 5: Rates -->
+        <div class="form-section">
+          <h3 class="section-title">💷 Rates</h3>
           <div class="form-row-2col">
             <div class="form-group">
               <label>Charge Rate <span class="currency">£/hour</span> <span class="required">*</span></label>
               <input type="number" id="chargeRate" name="chargeRate" step="0.01" min="0" placeholder="e.g., 18.75" required>
-              <small class="field-hint">Billing rate to client</small>
+              <small class="field-hint">What client pays per hour</small>
             </div>
+            <div class="form-group">
+              <label>Pay Rate <span class="currency">£/hour</span> <span class="required">*</span></label>
+              <input type="number" id="payRate" name="payRate" step="0.01" min="0" placeholder="e.g., 12.50" required onchange="calculateTotalPay()">
+              <small class="field-hint">What guard is paid per hour</small>
+            </div>
+          </div>
+          <div class="form-group">
+            <p style="background: #f0f4ff; padding: 10px; border-radius: 5px; margin: 10px 0;">
+              <strong>Calculated Total Pay:</strong> <span id="totalPayDisplay">£0.00</span>
+            </p>
           </div>
         </div>
 
-        <!-- Payment Amounts Section -->
+        <!-- SECTION 6: Bank Accounts (Multiple) -->
         <div class="form-section">
-          <h3 class="section-title">💷 Payment Amounts</h3>
+          <h3 class="section-title">🏦 Bank Account(s)</h3>
+          <p style="color: #666; margin-bottom: 15px;">Add one or more bank accounts for payment distribution</p>
+          
+          <div id="bankAccountsContainer">
+            <!-- Bank accounts will be added here dynamically -->
+          </div>
+          
+          <button type="button" class="btn btn-info" onclick="addBankAccount()">
+            ➕ Add Another Bank Account
+          </button>
+        </div>
+
+        <!-- SECTION 7: Legacy Payment Amounts (for backward compatibility) -->
+        <div class="form-section">
+          <h3 class="section-title">💷 Legacy Payment Amounts</h3>
+          <p style="color: #999; margin-bottom: 15px;">These fields are for backward compatibility. Use bank account distribution above.</p>
           <div class="form-row-3col">
             <div class="form-group">
-              <label>Pay 1 <span class="currency">£</span> <span class="required">*</span></label>
-              <input type="number" id="pay1" name="pay1" step="0.01" min="0" placeholder="e.g., 500" required>
+              <label>Pay 1 <span class="currency">£</span></label>
+              <input type="number" id="pay1" name="pay1" step="0.01" min="0" placeholder="e.g., 500">
               <small class="field-hint">Payroll 01</small>
             </div>
             <div class="form-group">
-              <label>Pay 2 <span class="currency">£</span> <span class="required">*</span></label>
-              <input type="number" id="pay2" name="pay2" step="0.01" min="0" placeholder="e.g., 550" required>
+              <label>Pay 2 <span class="currency">£</span></label>
+              <input type="number" id="pay2" name="pay2" step="0.01" min="0" placeholder="e.g., 550">
               <small class="field-hint">Payroll 02</small>
             </div>
             <div class="form-group">
-              <label>Pay 3 <span class="currency">£</span> <span class="required">*</span></label>
-              <input type="number" id="pay3" name="pay3" step="0.01" min="0" placeholder="e.g., 600" required>
+              <label>Pay 3 <span class="currency">£</span></label>
+              <input type="number" id="pay3" name="pay3" step="0.01" min="0" placeholder="e.g., 600">
               <small class="field-hint">Payroll 03</small>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bank Details Section -->
-        <div class="form-section">
-          <h3 class="section-title">🏦 Bank Account Details</h3>
-          <div class="form-row-2col">
-            <div class="form-group">
-              <label>Account Holder Name <span class="required">*</span></label>
-              <input type="text" id="accountHolderName" name="accountHolderName" placeholder="e.g., John Smith" required>
-              <small class="field-hint">Name on bank account</small>
-            </div>
-          </div>
-          <div class="form-row-2col">
-            <div class="form-group">
-              <label>Account Number <span class="required">*</span></label>
-              <input type="text" id="accountNo" name="accountNo" placeholder="e.g., 12345678" required>
-              <small class="field-hint">8-digit account number</small>
-            </div>
-            <div class="form-group">
-              <label>Sort Code <span class="required">*</span></label>
-              <input type="text" id="sortCode" name="sortCode" placeholder="e.g., 20-20-20" required>
-              <small class="field-hint">Format: XX-XX-XX</small>
             </div>
           </div>
         </div>
 
         <!-- Form Actions -->
         <div class="form-actions-professional">
-          <button type="button" class="btn btn-secondary btn-large" onclick="document.getElementById('formModal').classList.remove('active')">Cancel</button>
+          <button type="button" class="btn btn-secondary btn-large" onclick="closeFormModal()">Cancel</button>
           <button type="submit" class="btn btn-primary btn-large">💾 Save Record</button>
         </div>
       </form>
@@ -226,5 +308,6 @@
   </div>
 
   <script src="/js/main.js"></script>
+  <script src="/js/form-handler.js"></script>
 </body>
 </html>
