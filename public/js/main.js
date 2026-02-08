@@ -107,34 +107,60 @@ async function loadPayrollData() {
 
 function displayPayrollTable(payrollData) {
   const tableBody = document.getElementById('payrollTableBody');
-  if (!tableBody) return;
+  const cardGrid = document.getElementById('payrollCardGrid');
+  
+  if (!tableBody || !cardGrid) return;
 
   if (payrollData.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="15" class="text-center empty-state">
+        <td colspan="11" class="text-center empty-state">
           <h3>No payroll records found</h3>
           <p>Add a new record using the form above to get started.</p>
         </td>
       </tr>
     `;
+    cardGrid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <h3>No payroll records found</h3>
+        <p>Add a new record using the form above to get started.</p>
+      </div>
+    `;
     return;
   }
 
+  // Helper function to determine status
+  const getStatusBadge = (totalHours, totalMinutes) => {
+    const totalHoursDecimal = totalHours + (totalMinutes / 60);
+    const isCompleted = totalHoursDecimal >= 8;
+    const statusColor = isCompleted ? '#27ae60' : '#dc3545';
+    const statusText = isCompleted ? 'Duty Completed ✓' : 'Incomplete ✗';
+    const displayHours = totalHoursDecimal.toFixed(2);
+    
+    return {
+      color: statusColor,
+      text: statusText,
+      completed: isCompleted,
+      hours: displayHours
+    };
+  };
+
+  // Render Table View
   tableBody.innerHTML = payrollData.map(item => {
     const totalHoursDecimal = (item.totalHours || 0) + ((item.totalMinutes || 0) / 60);
     const totalPay = totalHoursDecimal * (item.payRate || 0);
-    const bankAccountCount = (item.bankAccounts && item.bankAccounts.length) ? item.bankAccounts.length : 0;
+    const status = getStatusBadge(item.totalHours || 0, item.totalMinutes || 0);
     
     return `
     <tr data-id="${item._id}">
       <td><strong>${item.guardName || '-'}</strong></td>
-      <td>${item.nationality || '-'}</td>
-      <td>${item.insuranceNumber || '-'}</td>
-      <td>${item.visaStatus || '-'}</td>
-      <td>${item.totalHours || 0}:${String(item.totalMinutes || 0).padStart(2, '0')}</td>
-      <td>£${(item.payRate || 0).toFixed(2)}</td>
-      <td><span class="badge">${bankAccountCount}</span></td>
+      <td><strong>${item.clientName || '-'}</strong></td>
+      <td>
+        <span class="status-badge" style="background-color: ${status.color}; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">
+          ${status.text}
+        </span>
+        <div style="font-size: 12px; margin-top: 4px; color: #666;">${status.hours}h worked</div>
+      </td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="exportPayrollPDF('${item._id}', '${item.guardName}')" title="Generate Enhanced PDF">
           📄 PDF
@@ -153,6 +179,362 @@ function displayPayrollTable(payrollData) {
     </tr>
   `;
   }).join('');
+
+  // Load today's daily hours and update table
+  const today = new Date().toISOString().split('T')[0];
+  payrollData.forEach(item => {
+    fetch(`/api/daily-hours/${item._id}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`)
+      .then(res => res.json())
+      .then(data => {
+        const todayRecord = data.data ? data.data.find(record => record.dateString === today) : null;
+        const row = tableBody.querySelector(`tr[data-id="${item._id}"]`);
+        
+        if (row && todayRecord) {
+          const statusColor = todayRecord.dutyCompleted ? '#27ae60' : '#dc3545';
+          const statusText = todayRecord.dutyCompleted ? 'DUTY COMPLETED ✓' : 'INCOMPLETE ✗';
+          const statusHtml = `
+            <span class="status-badge" style="background-color: ${statusColor}; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">
+              ${statusText}
+            </span>
+            <div style="font-size: 12px; margin-top: 4px; color: #666;">${todayRecord.hoursWorked}h ${todayRecord.minutesWorked}m (${todayRecord.signInTime} - ${todayRecord.signOffTime})</div>
+          `;
+          const statusCell = row.querySelector('td:nth-child(3)');
+          if (statusCell) statusCell.innerHTML = statusHtml;
+        }
+      })
+      .catch(err => console.error('Error loading today\'s hours:', err));
+  });
+
+  // Render Card View
+  cardGrid.innerHTML = payrollData.map(item => {
+    const status = getStatusBadge(item.totalHours || 0, item.totalMinutes || 0);
+    const bankAccountCount = (item.bankAccounts && item.bankAccounts.length) ? item.bankAccounts.length : 0;
+    
+    return `
+    <div class="payroll-card" data-id="${item._id}">
+      <div class="card-header" style="background-color: ${status.color}; border-bottom: 4px solid ${status.color};">
+        <div class="card-status-badge">${status.text}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-field">
+          <label>Guard Name</label>
+          <div class="card-value">${item.guardName || '-'}</div>
+        </div>
+        <div class="card-field">
+          <label>Client Name</label>
+          <div class="card-value">${item.clientName || '-'}</div>
+        </div>
+        <div class="card-divider"></div>
+        <div class="card-field">
+          <label>Hours Worked</label>
+          <div class="card-value card-hours">${status.hours}h (${item.totalHours || 0}h ${item.totalMinutes || 0}m)</div>
+        </div>
+        <div class="card-field">
+          <label>Pay Rate</label>
+          <div class="card-value">£${(item.payRate || 0).toFixed(2)}/hr</div>
+        </div>
+        <div class="card-field">
+          <label>Nationality</label>
+          <div class="card-value">${item.nationality || '-'}</div>
+        </div>
+        <div class="card-field">
+          <label>Insurance #</label>
+          <div class="card-value">${item.insuranceNumber || '-'}</div>
+        </div>
+        <div class="card-field">
+          <label>Visa Status</label>
+          <div class="card-value">${item.visaStatus || '-'}</div>
+        </div>
+        <div class="card-field">
+          <label>Bank Accounts</label>
+          <div class="card-value"><span class="badge">${bankAccountCount}</span></div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-sm btn-primary" onclick="exportPayrollPDF('${item._id}', '${item.guardName}')" title="Generate Enhanced PDF">
+          📄 PDF
+        </button>
+        <button class="btn btn-sm btn-edit" onclick="editPayroll('${item._id}')" title="Edit Record">
+          ✏️ Edit
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="deletePayroll('${item._id}')" title="Delete Record">
+          🗑️ Delete
+        </button>
+      </div>
+    </div>
+  `;
+  }).join('');
+  
+  // Update card status for today
+  payrollData.forEach(item => {
+    fetch(`/api/daily-hours/${item._id}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`)
+      .then(res => res.json())
+      .then(data => {
+        const todayRecord = data.data ? data.data.find(record => record.dateString === today) : null;
+        const card = cardGrid.querySelector(`div[data-id="${item._id}"]`);
+        
+        if (card && todayRecord) {
+          const statusColor = todayRecord.dutyCompleted ? '#27ae60' : '#dc3545';
+          const statusText = todayRecord.dutyCompleted ? 'DUTY COMPLETED ✓' : 'INCOMPLETE ✗';
+          
+          // Update card header color
+          const cardHeader = card.querySelector('.card-header');
+          cardHeader.style.backgroundColor = statusColor;
+          cardHeader.style.borderBottomColor = statusColor;
+          cardHeader.querySelector('.card-status-badge').textContent = statusText;
+        }
+      })
+      .catch(err => console.error('Error loading today\'s hours:', err));
+  });
+}
+
+// ==================== VIEW SWITCHING ====================
+
+function switchView(viewType) {
+  const tableView = document.getElementById('tableViewContainer');
+  const cardView = document.getElementById('cardViewContainer');
+  const calendarView = document.getElementById('calendarViewContainer');
+  const tableBtn = document.getElementById('toggleTableView');
+  const cardBtn = document.getElementById('toggleCardView');
+  const calendarBtn = document.getElementById('toggleCalendarView');
+  
+  // Hide all views
+  if (tableView) tableView.classList.remove('active');
+  if (cardView) cardView.classList.remove('active');
+  if (calendarView) calendarView.classList.remove('active');
+  if (tableBtn) tableBtn.classList.remove('active');
+  if (cardBtn) cardBtn.classList.remove('active');
+  if (calendarBtn) calendarBtn.classList.remove('active');
+  
+  // Show selected view
+  if (viewType === 'table') {
+    if (tableView) tableView.classList.add('active');
+    if (tableBtn) tableBtn.classList.add('active');
+  } else if (viewType === 'card') {
+    if (cardView) cardView.classList.add('active');
+    if (cardBtn) cardBtn.classList.add('active');
+  } else if (viewType === 'calendar') {
+    if (calendarView) calendarView.classList.add('active');
+    if (calendarBtn) calendarBtn.classList.add('active');
+    loadGuardSelector();
+  }
+}
+
+// ==================== CALENDAR FUNCTIONS ====================
+
+let currentMonthOffset = 0;
+let allPayrollData = [];
+
+function loadGuardSelector() {
+  fetch('/api/payroll')
+    .then(res => res.json())
+    .then(data => {
+      allPayrollData = data.data || [];
+      const selector = document.getElementById('guardSelector');
+      selector.innerHTML = '<option value="">-- Select a Guard --</option>';
+      allPayrollData.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item._id;
+        option.textContent = item.guardName;
+        selector.appendChild(option);
+      });
+    });
+}
+
+function loadGuardCalendar() {
+  const guardId = document.getElementById('guardSelector').value;
+  if (!guardId) {
+    document.getElementById('dailyHoursCalendar').innerHTML = '<p style="text-align: center; padding: 2rem;">Please select a guard</p>';
+    return;
+  }
+  
+  renderCalendar(guardId);
+}
+
+function renderCalendar(guardId) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + currentMonthOffset;
+  
+  // Handle month overflow
+  let displayYear = year;
+  let displayMonth = month;
+  if (displayMonth < 0) {
+    displayYear--;
+    displayMonth = 11;
+  } else if (displayMonth > 11) {
+    displayYear++;
+    displayMonth = 0;
+  }
+  
+  const monthName = new Date(displayYear, displayMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  document.getElementById('currentMonth').textContent = monthName;
+  
+  const firstDay = new Date(displayYear, displayMonth, 1);
+  const lastDay = new Date(displayYear, displayMonth + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+  
+  // Fetch daily hours for this month
+  fetch(`/api/daily-hours/${guardId}?month=${displayMonth + 1}&year=${displayYear}`)
+    .then(res => res.json())
+    .then(data => {
+      const dailyHoursMap = {};
+      if (data.success && data.data) {
+        data.data.forEach(record => {
+          dailyHoursMap[record.dateString] = record;
+        });
+      }
+      
+      let html = '<div class="calendar-grid">';
+      
+      // Days of week header
+      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      daysOfWeek.forEach(day => {
+        html += `<div class="calendar-header-day">${day}</div>`;
+      });
+      
+      // Empty cells before first day
+      for (let i = 0; i < startingDayOfWeek; i++) {
+        html += '<div class="calendar-empty"></div>';
+      }
+      
+      // Days of month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isPast = new Date(dateStr) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isToday = dateStr === now.toISOString().split('T')[0];
+        
+        let cellClass = 'calendar-day';
+        let content = `<div class="day-number">${day}</div>`;
+        
+        const dailyRecord = dailyHoursMap[dateStr];
+        if (dailyRecord) {
+          const statusColor = dailyRecord.dutyCompleted ? '#27ae60' : '#dc3545';
+          content += `<div class="day-hours">
+            <div class="hours-entry" style="background-color: ${statusColor};">
+              ${dailyRecord.totalHoursDecimal.toFixed(1)}h
+              <div class="hours-entry-time">${dailyRecord.signInTime} - ${dailyRecord.signOffTime}</div>
+            </div>
+          </div>`;
+          cellClass += dailyRecord.dutyCompleted ? ' completed' : ' incomplete';
+        } else {
+          content += `<div class="day-hours"><div class="no-entry">No entry</div></div>`;
+        }
+        
+        content += `<button class="btn btn-xs btn-primary" onclick="openDailyHoursModal('${guardId}', '${dateStr}')" style="width: 100%; margin-top: 4px;">+ Add</button>`;
+        
+        if (isToday) cellClass += ' today';
+        if (isPast && !isToday) cellClass += ' past';
+        
+        html += `<div class="${cellClass}">${content}</div>`;
+      }
+      
+      html += '</div>';
+      document.getElementById('dailyHoursCalendar').innerHTML = html;
+    })
+    .catch(err => {
+      console.error('Error loading daily hours:', err);
+      document.getElementById('dailyHoursCalendar').innerHTML = '<p style="color: #dc3545;">Error loading calendar data</p>';
+    });
+}
+
+function previousMonth() {
+  currentMonthOffset--;
+  const guardId = document.getElementById('guardSelector').value;
+  if (guardId) renderCalendar(guardId);
+}
+
+function nextMonth() {
+  currentMonthOffset++;
+  const guardId = document.getElementById('guardSelector').value;
+  if (guardId) renderCalendar(guardId);
+}
+
+function openDailyHoursModal(guardId, dateStr) {
+  const guard = allPayrollData.find(g => g._id === guardId);
+  if (!guard) return;
+  
+  document.getElementById('dailyGuardId').value = guardId;
+  document.getElementById('dailyDate').value = dateStr;
+  document.getElementById('dailyGuardName').value = guard.guardName;
+  document.getElementById('dailyLogDate').value = dateStr;
+  document.getElementById('signInTime').value = '';
+  document.getElementById('signOffTime').value = '';
+  document.getElementById('hoursWorked').value = '';
+  document.getElementById('dutyCompleted').checked = false;
+  
+  document.getElementById('dailyHoursModal').classList.add('active');
+}
+
+function closeDailyHoursModal() {
+  document.getElementById('dailyHoursModal').classList.remove('active');
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'signInTime' || e.target.id === 'signOffTime') {
+    const signIn = document.getElementById('signInTime').value;
+    const signOff = document.getElementById('signOffTime').value;
+    
+    if (signIn && signOff) {
+      const [inHour, inMin] = signIn.split(':').map(Number);
+      const [outHour, outMin] = signOff.split(':').map(Number);
+      
+      let inMinutes = inHour * 60 + inMin;
+      let outMinutes = outHour * 60 + outMin;
+      
+      if (outMinutes < inMinutes) {
+        outMinutes += 24 * 60; // Handle overnight shifts
+      }
+      
+      const totalMinutes = outMinutes - inMinutes;
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      
+      document.getElementById('hoursWorked').value = `${hours}h ${minutes}m`;
+      document.getElementById('dutyCompleted').checked = hours >= 8;
+    }
+  }
+});
+
+function saveDailyHours() {
+  const guardId = document.getElementById('dailyGuardId').value;
+  const dateStr = document.getElementById('dailyDate').value;
+  const signInTime = document.getElementById('signInTime').value;
+  const signOffTime = document.getElementById('signOffTime').value;
+  const dutyCompleted = document.getElementById('dutyCompleted').checked;
+  
+  if (!signInTime || !signOffTime) {
+    alert('Please enter both sign-in and sign-off times');
+    return;
+  }
+  
+  // Save to backend
+  fetch('/api/daily-hours', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      payrollId: guardId,
+      date: dateStr,
+      signInTime: signInTime,
+      signOffTime: signOffTime,
+      dutyCompleted: dutyCompleted
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      showAlert('Daily hours saved successfully', 'success');
+      closeDailyHoursModal();
+      loadGuardCalendar();
+    } else {
+      showAlert('Error saving daily hours: ' + data.message, 'danger');
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    showAlert('Error saving daily hours', 'danger');
+  });
 }
 
 // ==================== FORM HANDLING ====================

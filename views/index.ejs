@@ -88,25 +88,36 @@
         </div>
       </div>
 
-      <!-- Payroll Table -->
-      <div class="table-container">
+      <!-- View Toggle -->
+      <div class="view-toggle-section">
+        <div class="view-toggle-buttons">
+          <button id="toggleTableView" class="btn btn-toggle active" onclick="switchView('table')">
+            📋 Table View
+          </button>
+          <button id="toggleCardView" class="btn btn-toggle" onclick="switchView('card')">
+            📅 Card View
+          </button>
+          <button id="toggleCalendarView" class="btn btn-toggle" onclick="switchView('calendar')">
+            📆 Daily Hours Calendar
+          </button>
+        </div>
+      </div>
+
+      <!-- Payroll Table View -->
+      <div id="tableViewContainer" class="table-container view-container active">
         <table>
           <thead>
             <tr>
               <th>Guard Name</th>
-              <th>Nationality</th>
-              <th>Insurance #</th>
-              <th>Visa Status</th>
-              <th>Hours:Min</th>
-              <th>Pay Rate</th>
-              <th>Bank Accounts</th>
+              <th>Client Name</th>
+              <th>Status</th>
               <th>📄 Generate</th>
               <th>⚙️ Manage</th>
             </tr>
           </thead>
           <tbody id="payrollTableBody">
             <tr>
-              <td colspan="9" class="text-center">
+              <td colspan="5" class="text-center">
                 <div class="spinner">
                   <div class="loading"></div>
                   <span>Loading records...</span>
@@ -115,6 +126,83 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Payroll Card View -->
+      <div id="cardViewContainer" class="card-view-container view-container">
+        <div id="payrollCardGrid" class="payroll-card-grid">
+          <!-- Cards will be populated here -->
+        </div>
+      </div>
+
+      <!-- Daily Hours Calendar View -->
+      <div id="calendarViewContainer" class="calendar-view-container view-container">
+        <div class="calendar-controls">
+          <div class="calendar-selector">
+            <label>Select Guard: </label>
+            <select id="guardSelector" onchange="loadGuardCalendar()">
+              <option value="">-- Select a Guard --</option>
+            </select>
+          </div>
+          <div class="calendar-month-nav">
+            <button onclick="previousMonth()" class="btn btn-sm">◀ Previous</button>
+            <span id="currentMonth" class="current-month">Current Month</span>
+            <button onclick="nextMonth()" class="btn btn-sm">Next ▶</button>
+          </div>
+        </div>
+        <div id="dailyHoursCalendar" class="daily-hours-calendar">
+          <!-- Calendar will be populated here -->
+        </div>
+      </div>
+
+      <!-- Daily Hours Modal -->
+      <div id="dailyHoursModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+          <div class="modal-header">
+            <h2>Log Daily Hours</h2>
+            <button class="modal-close" onclick="closeDailyHoursModal()">✕</button>
+          </div>
+          <div class="modal-body" style="padding: 2rem;">
+            <input type="hidden" id="dailyGuardId">
+            <input type="hidden" id="dailyDate">
+            
+            <div class="form-group">
+              <label>Guard Name</label>
+              <input type="text" id="dailyGuardName" readonly class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="dailyLogDate" readonly class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Sign-In Time</label>
+              <input type="time" id="signInTime" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Sign-Off Time</label>
+              <input type="time" id="signOffTime" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Hours Worked (Auto-calculated)</label>
+              <input type="text" id="hoursWorked" readonly class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="dutyCompleted">
+                Duty Completed (8+ hours)
+              </label>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+              <button onclick="closeDailyHoursModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+              <button onclick="saveDailyHours()" class="btn btn-primary" style="flex: 1;">Save</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </main>

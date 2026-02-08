@@ -1199,3 +1199,465 @@ tbody tr:last-child td {
     page-break-inside: avoid;
   }
 }
+
+/* ==================== VIEW TOGGLE & CARD VIEW ==================== */
+
+.view-toggle-section {
+  margin: 2rem 0;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.view-toggle-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.btn-toggle {
+  padding: 10px 20px;
+  border: 2px solid #ddd;
+  background: white;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-toggle:hover {
+  border-color: #1a365d;
+  color: #1a365d;
+  transform: translateY(-2px);
+}
+
+.btn-toggle.active {
+  background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+  color: white;
+  border-color: #1a365d;
+  box-shadow: 0 4px 12px rgba(26, 54, 93, 0.3);
+}
+
+.view-container {
+  display: none;
+}
+
+.view-container.active {
+  display: block;
+  animation: fadeInView 0.3s ease;
+}
+
+@keyframes fadeInView {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card View Grid */
+.card-view-container {
+  padding: 2rem 0;
+}
+
+.payroll-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+  padding: 1rem 0;
+}
+
+.payroll-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  border: 2px solid #eee;
+}
+
+.payroll-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: #1a365d;
+}
+
+.card-header {
+  padding: 1.5rem;
+  color: white;
+  text-align: center;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-status-badge {
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-field {
+  margin-bottom: 1rem;
+}
+
+.card-field:last-of-type {
+  margin-bottom: 0;
+}
+
+.card-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.card-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  padding: 6px 0;
+  word-break: break-word;
+}
+
+.card-hours {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1a365d;
+}
+
+.card-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ddd, transparent);
+  margin: 1rem 0;
+}
+
+.card-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-footer .btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.status-badge {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive Design for Cards */
+@media (max-width: 768px) {
+  .payroll-card-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .view-toggle-buttons {
+    flex-direction: column;
+  }
+
+  .btn-toggle {
+    width: 100%;
+  }
+
+  .card-footer {
+    flex-direction: column;
+  }
+
+  .card-footer .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .payroll-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+}
+/* ==================== DAILY HOURS CALENDAR ==================== */
+
+.calendar-view-container {
+  padding: 2rem 0;
+}
+
+.calendar-controls {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.calendar-selector {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.calendar-selector label {
+  font-weight: 600;
+  color: #333;
+}
+
+.calendar-selector select {
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 200px;
+  cursor: pointer;
+}
+
+.calendar-selector select:focus {
+  outline: none;
+  border-color: #1a365d;
+  box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.1);
+}
+
+.calendar-month-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.current-month {
+  font-weight: 600;
+  font-size: 16px;
+  color: #1a365d;
+  min-width: 180px;
+  text-align: center;
+}
+
+.calendar-month-nav .btn {
+  padding: 8px 16px;
+}
+
+.daily-hours-calendar {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1rem;
+  min-height: 600px;
+}
+
+.calendar-header-day {
+  font-weight: bold;
+  text-align: center;
+  color: #1a365d;
+  padding: 1rem 0.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  border-radius: 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.calendar-empty {
+  background: transparent;
+}
+
+.calendar-day {
+  background: white;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  border-color: #1a365d;
+  box-shadow: 0 4px 12px rgba(26, 54, 93, 0.1);
+  transform: translateY(-2px);
+}
+
+.calendar-day.today {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);
+  border-color: #1a365d;
+  border-width: 2px;
+}
+
+.calendar-day.past {
+  background: #f5f5f5;
+  opacity: 0.7;
+}
+
+.calendar-day.completed {
+  border-color: #27ae60;
+  border-width: 2px;
+}
+
+.calendar-day.incomplete {
+  border-color: #dc3545;
+  border-width: 2px;
+}
+
+.day-number {
+  font-weight: bold;
+  font-size: 16px;
+  color: #1a365d;
+  margin-bottom: 0.5rem;
+}
+
+.day-hours {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.no-entry {
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.hours-entry {
+  background: #27ae60;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.hours-entry.incomplete {
+  background: #dc3545;
+}
+
+.hours-entry-time {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.calendar-day .btn-xs {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+/* Daily Hours Modal */
+.modal-body {
+  padding: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+  font-size: 14px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #1a365d;
+  box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.1);
+}
+
+.form-control[readonly] {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.form-group input[type="checkbox"] {
+  margin-right: 0.5rem;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.form-group label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .calendar-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+  }
+
+  .calendar-day {
+    min-height: 100px;
+    padding: 0.75rem;
+    font-size: 12px;
+  }
+
+  .day-number {
+    font-size: 14px;
+  }
+
+  .calendar-controls {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .calendar-selector,
+  .calendar-month-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .calendar-selector select {
+    min-width: auto;
+    flex: 1;
+  }
+
+  .current-month {
+    min-width: auto;
+  }
+}

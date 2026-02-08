@@ -8,6 +8,7 @@ const { body, validationResult } = require('express-validator');
 
 // Import models and utilities
 const Payroll = require('./models/Payroll');
+const DailyHours = require('./models/DailyHours');
 const pdfGenerator = require('./utils/pdfGenerator');
 const excelParser = require('./utils/excelParser');
 const EnhancedPdfGenerator = require('./utils/enhancedPdfGenerator');
@@ -675,6 +676,177 @@ app.post('/api/export/payroll-pdf/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error exporting payroll PDF',
+      error: error.message
+    });
+  }
+});
+
+// ==================== DAILY HOURS ENDPOINTS ====================
+
+// POST - Add or update daily hours
+app.post('/api/daily-hours', async (req, res) => {
+  try {
+    const { payrollId, date, signInTime, signOffTime, dutyCompleted, notes } = req.body;
+
+    if (!payrollId || !date || !signInTime || !signOffTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: payrollId, date, signInTime, signOffTime'
+      });
+    }
+
+    // Calculate hours worked
+    const [inHour, inMin] = signInTime.split(':').map(Number);
+    const [outHour, outMin] = signOffTime.split(':').map(Number);
+
+    let inMinutes = inHour * 60 + inMin;
+    let outMinutes = outHour * 60 + outMin;
+
+    if (outMinutes < inMinutes) {
+      outMinutes += 24 * 60; // Handle overnight shifts
+    }
+
+    const totalMinutes = outMinutes - inMinutes;
+    const hoursWorked = Math.floor(totalMinutes / 60);
+    const minutesWorked = totalMinutes % 60;
+    const totalHoursDecimal = hoursWorked + minutesWorked / 60;
+
+    // Find or create daily hours record
+    const dateObj = new Date(date);
+    const dateString = date;
+
+    let dailyHours = await DailyHours.findOne({
+      payrollId: payrollId,
+      dateString: dateString
+    });
+
+    if (dailyHours) {
+      // Update existing record
+      dailyHours.signInTime = signInTime;
+      dailyHours.signOffTime = signOffTime;
+      dailyHours.hoursWorked = hoursWorked;
+      dailyHours.minutesWorked = minutesWorked;
+      dailyHours.totalHoursDecimal = totalHoursDecimal;
+      dailyHours.dutyCompleted = dutyCompleted || totalHoursDecimal >= 8;
+      dailyHours.notes = notes || '';
+      dailyHours.updatedAt = new Date();
+    } else {
+      // Create new record
+      dailyHours = new DailyHours({
+        payrollId,
+        date: dateObj,
+        dateString,
+        signInTime,
+        signOffTime,
+        hoursWorked,
+        minutesWorked,
+        totalHoursDecimal,
+        dutyCompleted: dutyCompleted || totalHoursDecimal >= 8,
+        notes: notes || ''
+      });
+    }
+
+    await dailyHours.save();
+
+    // Update total hours in payroll record
+    const allDailyHours = await DailyHours.find({ payrollId });
+    const totalMinutesAll = allDailyHours.reduce((sum, record) => {
+      return sum + (record.hoursWorked * 60 + record.minutesWorked);
+    }, 0);
+
+    const totalHoursAll = Math.floor(totalMinutesAll / 60);
+    const totalMinutesRemainder = totalMinutesAll % 60;
+
+    await Payroll.findByIdAndUpdate(payrollId, {
+      totalHours: totalHoursAll,
+      totalMinutes: totalMinutesRemainder
+    });
+
+    res.json({
+      success: true,
+      message: 'Daily hours logged successfully',
+      data: dailyHours
+    });
+  } catch (error) {
+    console.error('Error logging daily hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error logging daily hours',
+      error: error.message
+    });
+  }
+});
+
+// GET - Get daily hours for a guard
+app.get('/api/daily-hours/:payrollId', async (req, res) => {
+  try {
+    const { payrollId } = req.params;
+    const { month, year } = req.query;
+
+    let query = { payrollId };
+
+    // Filter by month and year if provided
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+
+      query.date = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    }
+
+    const dailyHours = await DailyHours.find(query).sort({ dateString: 1 });
+
+    res.json({
+      success: true,
+      data: dailyHours
+    });
+  } catch (error) {
+    console.error('Error fetching daily hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching daily hours',
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Delete daily hours record
+app.delete('/api/daily-hours/:id', async (req, res) => {
+  try {
+    const dailyHours = await DailyHours.findByIdAndDelete(req.params.id);
+
+    if (!dailyHours) {
+      return res.status(404).json({
+        success: false,
+        message: 'Daily hours record not found'
+      });
+    }
+
+    // Recalculate total hours
+    const allDailyHours = await DailyHours.find({ payrollId: dailyHours.payrollId });
+    const totalMinutesAll = allDailyHours.reduce((sum, record) => {
+      return sum + (record.hoursWorked * 60 + record.minutesWorked);
+    }, 0);
+
+    const totalHoursAll = Math.floor(totalMinutesAll / 60);
+    const totalMinutesRemainder = totalMinutesAll % 60;
+
+    await Payroll.findByIdAndUpdate(dailyHours.payrollId, {
+      totalHours: totalHoursAll,
+      totalMinutes: totalMinutesRemainder
+    });
+
+    res.json({
+      success: true,
+      message: 'Daily hours record deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting daily hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting daily hours',
       error: error.message
     });
   }

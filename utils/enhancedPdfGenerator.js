@@ -258,185 +258,187 @@ class EnhancedPayrollPDFGenerator {
   }
 
   /**
-   * Add bank account(s) section
+   * Add bank accounts section
    */
   addBankAccountsSection(doc, data) {
-    this.addSectionTitle(doc, '🏦 BANK ACCOUNT DETAILS');
-
     if (!data.bankAccounts || data.bankAccounts.length === 0) {
-      // Fallback to legacy fields
-      this.addLegacyBankDetails(doc, data);
       return;
     }
 
+    this.addSectionTitle(doc, '🏦 BANK ACCOUNT(S)');
+
     data.bankAccounts.forEach((account, index) => {
-      const infoBoxX = this.margin;
-      const infoBoxWidth = this.pageWidth - 2 * this.margin;
+      const isActive = account.active !== false;
+      const isPrimary = account.isPrimary === true;
+      
+      const statusColor = isActive ? this.accentColor : '#ccc';
+      const statusText = isActive ? '✓ Active' : '✗ Inactive';
 
       // Account header
-      doc.fontSize(11).font('Helvetica-Bold')
-        .fillColor(this.secondaryColor);
-      if (account.isPrimary) {
-        doc.text(`Account ${index + 1} (PRIMARY)`, infoBoxX, doc.y);
-      } else {
-        doc.text(`Account ${index + 1}`, infoBoxX, doc.y);
-      }
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(this.primaryColor);
+      doc.text(`Account ${index + 1}${isPrimary ? ' (Primary)' : ''}`, this.margin, doc.y);
 
-      doc.fontSize(10).font('Helvetica');
+      // Account details box
+      const boxX = this.margin;
+      const boxWidth = this.pageWidth - 2 * this.margin;
+      doc.rect(boxX, doc.y, boxWidth, 70).fill(this.lightGray);
 
-      // Background
-      doc.rect(infoBoxX, doc.y + 5, infoBoxWidth, 65)
-        .fill(this.lightGray);
+      const boxY = doc.y + 10;
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
 
-      const infoY = doc.y + 15;
-      doc.fillColor('#000000');
+      // Account holder name
+      doc.text('Account Holder:', boxX + 10, boxY);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(account.accountHolderName || 'N/A', boxX + 150, boxY - 9);
 
-      // Account details in 2x2 grid
-      doc.text('Account Holder:', infoBoxX + 10, infoY);
-      doc.text(account.accountHolderName || 'N/A', infoBoxX + 140, infoY);
+      // Bank name
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Bank Name:', boxX + 10, boxY + 15);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(account.bankName || 'N/A', boxX + 150, boxY + 6);
 
-      doc.text('Bank Name:', infoBoxX + 10, infoY + 15);
-      doc.text(account.bankName || 'N/A', infoBoxX + 140, infoY + 15);
+      // Sort code
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Sort Code:', boxX + 10, boxY + 30);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(account.sortCode || 'N/A', boxX + 150, boxY + 21);
 
-      doc.text('Sort Code:', infoBoxX + 10, infoY + 30);
-      doc.text(account.sortCode || 'N/A', infoBoxX + 140, infoY + 30);
+      // Account number
+      doc.fontSize(9).font('Helvetica').fillColor('#666666');
+      doc.text('Account #:', boxX + 10, boxY + 45);
+      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+      doc.text(account.accountNumber || 'N/A', boxX + 150, boxY + 36);
 
-      doc.text('Account Number:', infoBoxX + 10, infoY + 45);
-      doc.text(account.accountNumber || 'N/A', infoBoxX + 140, infoY + 45);
+      // Status badge
+      doc.fillColor(statusColor).fontSize(9).font('Helvetica-Bold');
+      doc.text(statusText, boxX + boxWidth - 100, boxY);
 
-      doc.y += 75;
+      doc.y += 85;
     });
   }
 
   /**
-   * Add legacy bank details (fallback)
-   */
-  addLegacyBankDetails(doc, data) {
-    const infoBoxX = this.margin;
-    const infoBoxWidth = this.pageWidth - 2 * this.margin;
-
-    doc.rect(infoBoxX, doc.y, infoBoxWidth, 65)
-      .fill(this.lightGray);
-
-    const infoY = doc.y + 10;
-    doc.fontSize(10);
-
-    doc.fillColor('#666666');
-    doc.text('Account Holder:', infoBoxX + 10, infoY);
-    doc.fillColor('#000000');
-    doc.text(data.accountHolderName || 'N/A', infoBoxX + 140, infoY);
-
-    doc.fillColor('#666666');
-    doc.text('Sort Code:', infoBoxX + 10, infoY + 15);
-    doc.fillColor('#000000');
-    doc.text(data.sortCode || 'N/A', infoBoxX + 140, infoY + 15);
-
-    doc.fillColor('#666666');
-    doc.text('Account Number:', infoBoxX + 10, infoY + 30);
-    doc.fillColor('#000000');
-    doc.text(data.accountNo || 'N/A', infoBoxX + 140, infoY + 30);
-
-    doc.y += 75;
-  }
-
-  /**
-   * Add payment summary
+   * Add payment summary section
    */
   addPaymentSummary(doc, data) {
     this.addSectionTitle(doc, '💰 PAYMENT SUMMARY');
 
+    const totalHoursDecimal = (data.totalHours || 0) + ((data.totalMinutes || 0) / 60);
+    const payRate = parseFloat(data.payRate) || 0;
+    const chargeRate = parseFloat(data.chargeRate) || 0;
+    const totalPay = totalHoursDecimal * payRate;
+    const totalCharge = totalHoursDecimal * chargeRate;
+
     const summaryBoxX = this.margin;
     const summaryBoxWidth = this.pageWidth - 2 * this.margin;
 
-    // Summary info
-    const totalHoursDecimal = data.totalHours + data.totalMinutes / 60;
-    const totalPay = totalHoursDecimal * parseFloat(data.payRate);
+    // Summary box
+    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 80)
+      .stroke(this.borderColor);
 
-    doc.rect(summaryBoxX, doc.y, summaryBoxWidth, 50)
-      .fill(this.accentColor);
+    const summaryY = doc.y + 15;
 
-    doc.fontSize(14).font('Helvetica-Bold')
-      .fillColor('#ffffff')
-      .text('Total Payment Due: £' + totalPay.toFixed(2), summaryBoxX + 20, doc.y + 15);
+    // Left column
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Hours Worked:', summaryBoxX + 20, summaryY);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text(totalHoursDecimal.toFixed(2) + ' hours', summaryBoxX + 150, summaryY - 10);
 
-    doc.fontSize(10).font('Helvetica')
-      .text(`Calculation: ${totalHoursDecimal.toFixed(2)} hours × £${parseFloat(data.payRate).toFixed(2)}/hour = £${totalPay.toFixed(2)}`, 
-        summaryBoxX + 20, doc.y + 15);
+    doc.fontSize(10).font('Helvetica').fillColor('#666666');
+    doc.text('Pay Rate:', summaryBoxX + 20, summaryY + 20);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + payRate.toFixed(2) + '/hour', summaryBoxX + 150, summaryY + 10);
 
-    doc.y += 60;
+    // Right column
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(this.accentColor);
+    doc.text('TOTAL PAY:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY);
+    doc.fontSize(14).fillColor(this.accentColor);
+    doc.text('£' + totalPay.toFixed(2), summaryBoxX + summaryBoxWidth / 2 + 150, summaryY - 10);
+
+    doc.fontSize(9).font('Helvetica').fillColor('#666666');
+    doc.text('Charge Rate:', summaryBoxX + summaryBoxWidth / 2 + 20, summaryY + 20);
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    doc.text('£' + chargeRate.toFixed(2) + '/hour', summaryBoxX + summaryBoxWidth / 2 + 150, summaryY + 10);
+
+    doc.y += 100;
   }
 
   /**
-   * Add section title with decorative line
+   * Add footer
+   */
+  addFooter(doc) {
+    const footerY = this.pageHeight - this.margin - 20;
+
+    // Divider line
+    doc.moveTo(this.margin, footerY)
+      .lineTo(this.pageWidth - this.margin, footerY)
+      .stroke(this.borderColor);
+
+    // Footer text
+    doc.fontSize(9)
+      .fillColor('#999999')
+      .text('This is a confidential payroll statement. For official use only.', 
+        this.margin, footerY + 10, 
+        { align: 'center', width: this.pageWidth - 2 * this.margin });
+
+    doc.fontSize(8)
+      .text('Generated on ' + new Date().toLocaleString('en-GB'), 
+        this.margin, footerY + 25, 
+        { align: 'center', width: this.pageWidth - 2 * this.margin });
+  }
+
+  /**
+   * Add section title
    */
   addSectionTitle(doc, title) {
-    doc.fontSize(12).font('Helvetica-Bold')
-      .fillColor(this.primaryColor)
-      .text(title, this.margin, doc.y);
+    const sectionY = doc.y + 10;
 
-    doc.moveTo(this.margin, doc.y + 3)
-      .lineTo(this.pageWidth - this.margin, doc.y + 3)
-      .strokeColor(this.accentColor)
-      .stroke();
+    // Background line
+    doc.rect(this.margin, sectionY, this.pageWidth - 2 * this.margin, 30)
+      .fill(this.primaryColor);
 
-    doc.y += 25;
+    // Title
+    doc.fontSize(13)
+      .font('Helvetica-Bold')
+      .fillColor('#ffffff')
+      .text(title, this.margin + 15, sectionY + 6, { width: this.pageWidth - 2 * this.margin - 30 });
+
+    doc.y = sectionY + 35;
   }
 
   /**
    * Draw a table row
    */
-  drawTableRow(doc, startX, startY, cols) {
-    const rowHeight = 25;
-    const padding = 8;
+  drawTableRow(doc, startX, startY, cells) {
+    const rowHeight = 30;
+    const borderColor = this.borderColor;
 
-    // Draw background for alternate rows
+    // Draw cells
     let currentX = startX;
-    
-    cols.forEach(col => {
-      doc.rect(currentX, startY, col.width, rowHeight)
-        .fillAndStroke(this.lightGray, this.borderColor);
+    cells.forEach(cell => {
+      const cellWidth = cell.width;
 
+      // Cell background
+      doc.rect(currentX, startY, cellWidth, rowHeight)
+        .fillAndStroke(this.lightGray, borderColor);
+
+      // Cell text
       doc.fontSize(10);
-      if (col.isBold) {
-        doc.font('Helvetica-Bold');
+      if (cell.isBold) {
+        doc.font('Helvetica-Bold').fillColor(this.primaryColor);
       } else {
-        doc.font('Helvetica');
+        doc.font('Helvetica').fillColor('#333333');
       }
-      doc.fillColor('#000000')
-        .text(col.text, currentX + padding, startY + padding + 2, { 
-          width: col.width - 2 * padding,
-          align: 'left'
-        });
 
-      currentX += col.width;
+      doc.text(cell.text, currentX + 8, startY + 8, {
+        width: cellWidth - 16,
+        align: 'left'
+      });
+
+      currentX += cellWidth;
     });
 
     doc.y = startY + rowHeight;
-  }
-
-  /**
-   * Add professional footer
-   */
-  addFooter(doc) {
-    const footerY = this.pageHeight - 60;
-
-    // Line separator
-    doc.moveTo(this.margin, footerY)
-      .lineTo(this.pageWidth - this.margin, footerY)
-      .strokeColor(this.borderColor)
-      .stroke();
-
-    // Footer text
-    doc.fontSize(8).font('Helvetica')
-      .fillColor('#999999')
-      .text('This is an official payroll statement. Please retain for your records.', 
-        this.margin, footerY + 10, { align: 'center' });
-
-    doc.text(`Document generated on ${new Date().toLocaleString('en-GB')}`, 
-      this.margin, footerY + 20, { align: 'center' });
-
-    doc.text('Confidential - For Employee Use Only', 
-      this.margin, footerY + 30, { align: 'center' });
   }
 }
 
