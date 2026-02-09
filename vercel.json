@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "buildCommand": "npm install",
+  "env": {
+    "NODE_ENV": "@node_env",
+    "MONGODB_URI": "@mongodb_uri"
+  },
+  "functions": {
+    "app.js": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.js"
+    }
+  ]
+}

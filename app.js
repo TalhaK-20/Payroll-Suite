@@ -64,16 +64,45 @@ const upload = multer({
 
 // ==================== DATABASE CONNECTION ====================
 
-mongoose.connect(process.env.MONGODB_URI, {
+const mongoUri = process.env.MONGODB_URI;
+
+if (!mongoUri) {
+  console.error('❌ MONGODB_URI not set in environment variables');
+  process.exit(1);
+}
+
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  maxPoolSize: 10,
+  minPoolSize: 5,
+  socketTimeoutMS: 45000,
+  serverSelectionTimeoutMS: 30000,
+  connectTimeoutMS: 30000,
+  retryWrites: true,
+  retryReads: true,
+  w: 'majority'
 })
   .then(() => {
     console.log('✅ MongoDB connected successfully');
   })
   .catch(err => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err.message);
+    // Don't exit on error, allow graceful handling
   });
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('✅ Mongoose connected to database');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ Mongoose disconnected from database');
+});
 
 // ==================== VALIDATION MIDDLEWARE ====================
 
