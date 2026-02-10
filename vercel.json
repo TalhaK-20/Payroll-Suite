@@ -2,8 +2,7 @@
   "version": 2,
   "buildCommand": "npm install",
   "env": {
-    "NODE_ENV": "@node_env",
-    "MONGODB_URI": "@mongodb_uri"
+    "NODE_ENV": "production"
   },
   "functions": {
     "app.js": {
